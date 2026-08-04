@@ -63,8 +63,7 @@ seeded, that figure is identical for every player.
 ## Hints
 
 Stuck? **Hint** runs the solver from the position you are actually in and rings
-the one block you should move next. You get **three per puzzle**, and the counter
-on the button shows what is left. Restarting or dealing a new board resets them.
+the one block you should move next. You get **three per puzzle**, and a badge on the button counts down what is left. Restarting or dealing a new board resets them.
 
 The solver is a beam search over legal slides, guided by the total column
 distance of every block from its target column. It typically answers in well

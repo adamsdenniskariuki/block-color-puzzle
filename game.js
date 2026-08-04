@@ -119,6 +119,7 @@
     diffNote: document.getElementById('diff-note'),
     undo:     document.getElementById('btn-undo'),
     hint:     document.getElementById('btn-hint'),
+    hintBadge: document.getElementById('hint-badge'),
     hints:    document.getElementById('opt-hints'),
     symbols:  document.getElementById('opt-symbols'),
     sound:    document.getElementById('opt-sound'),
@@ -436,11 +437,6 @@
     return { stars, best: levels.results[n], improved: !previous || stars > previous.stars };
   }
 
-  function totalStars() {
-    const results = loadLevels().results;
-    return Object.keys(results).reduce((sum, k) => sum + results[k].stars, 0);
-  }
-
   // A tiny seeded generator so a given date always builds the same board.
   function seedFrom(text) {
     let h = 2166136261 >>> 0;
@@ -574,8 +570,13 @@
   }
 
   function syncHintButton() {
-    el.hint.textContent = state.hintsLeft > 0 ? 'Hint ' + state.hintsLeft : 'Hint';
-    el.hint.disabled = state.solved || state.hintsLeft <= 0;
+    const left = state.hintsLeft;
+    // The badge is decorative; the button carries the count for screen readers.
+    el.hintBadge.hidden = left <= 0;
+    el.hintBadge.textContent = String(left);
+    el.hint.setAttribute('aria-label',
+      left > 0 ? 'Hint, ' + left + ' remaining' : 'Hint, none remaining');
+    el.hint.disabled = state.solved || left <= 0;
   }
 
   function showHint() {
