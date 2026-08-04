@@ -36,8 +36,14 @@
     help:     document.getElementById('help'),
     undo:     document.getElementById('btn-undo'),
     hints:    document.getElementById('opt-hints'),
-    symbols:  document.getElementById('opt-symbols')
+    symbols:  document.getElementById('opt-symbols'),
+    sound:    document.getElementById('opt-sound'),
+    haptics:  document.getElementById('opt-haptics'),
+    hapticsWrap: document.getElementById('opt-haptics-wrap'),
+    confetti: document.getElementById('confetti')
   };
+
+  const FX = window.BCPFX;
 
   const state = {
     rows: 5,
@@ -83,15 +89,26 @@
     const store = loadStore();
     el.hints.checked = !!store.hints;
     el.symbols.checked = !!store.symbols;
+    // Sound and vibration are on unless explicitly turned off.
+    el.sound.checked = store.sound !== false;
+    el.haptics.checked = store.haptics !== false;
     if (store.rows && [4, 5, 6].includes(store.rows)) state.rows = store.rows;
+    applyFxPrefs();
   }
 
   function savePrefs() {
     const store = loadStore();
     store.hints = el.hints.checked;
     store.symbols = el.symbols.checked;
+    store.sound = el.sound.checked;
+    store.haptics = el.haptics.checked;
     store.rows = state.rows;
     saveStore(store);
+  }
+
+  function applyFxPrefs() {
+    FX.sound.enabled = el.sound.checked;
+    FX.haptics.enabled = el.haptics.checked;
   }
 
   /* ---------------- helpers ---------------- */
@@ -206,7 +223,10 @@
       tile.dataset.colour = String(colour);
       tile.textContent = el.symbols.checked ? COLORS[colour].sym : '';
       tile.setAttribute('aria-label', COLORS[colour].name);
-      tile.addEventListener('click', () => slideTo(Number(tile.dataset.index), true));
+      tile.addEventListener('click', () => {
+        if (fromSwipe()) return;
+        slideTo(Number(tile.dataset.index), true);
+      });
 
       el.board.appendChild(tile);
       state.tiles[i] = tile;
@@ -281,6 +301,8 @@
         void tile.offsetWidth;
         tile.classList.add('is-nudge');
       }
+      FX.sound.bump();
+      FX.haptics.bump();
       return;
     }
 
@@ -311,6 +333,8 @@
     if (record) {
       state.history.push(gapBefore);
       state.moves += moved;
+      FX.sound.slide(moved);
+      FX.haptics.slide(moved);
       startTimer();
       updateHud();
     }
@@ -328,6 +352,8 @@
     const target = state.history.pop();
     const moved = slideTo(target, false) || 0;
     state.moves = Math.max(0, state.moves - moved);
+    FX.sound.click();
+    FX.haptics.slide(1);
     updateHud();
     refreshTileState();
   }
@@ -367,6 +393,10 @@
     el.winBest.hidden = !isNewBest;
     el.win.hidden = false;
     updateHud();
+
+    FX.sound.win();
+    FX.haptics.win();
+    FX.confetti.burst(COLORS.map(c => c.hex));
   }
 
   /* ---------------- lifecycle ---------------- */
@@ -378,6 +408,7 @@
     state.history = [];
     state.solved = false;
     el.win.hidden = true;
+    FX.confetti.clear();
 
     buildSolved();
     scramble();
@@ -398,6 +429,7 @@
     state.history = [];
     state.solved = false;
     el.win.hidden = true;
+    FX.confetti.clear();
 
     state.board = state.initial.board.slice();
     state.gap = state.initial.gap;
@@ -426,6 +458,16 @@
   });
 
   el.hints.addEventListener('change', () => { savePrefs(); refreshTileState(); });
+  el.sound.addEventListener('change', () => {
+    savePrefs();
+    applyFxPrefs();
+    if (el.sound.checked) FX.sound.click();
+  });
+  el.haptics.addEventListener('change', () => {
+    savePrefs();
+    applyFxPrefs();
+    if (el.haptics.checked) FX.haptics.slide(2);
+  });
   el.symbols.addEventListener('change', () => {
     savePrefs();
     renderGuide();
@@ -457,7 +499,77 @@
     slideTo(source, true);
   });
 
-  window.addEventListener('resize', layout);
+  window.addEventListener('resize', () => { layout(); FX.confetti.resize(); });
+
+  /* ---------------- swipe ---------------- */
+
+  const SWIPE_MIN = 18;         // px before a drag counts as a swipe
+  let swipe = null;
+  let swipeEndedAt = 0;
+
+  // A swipe fires pointerup then click; ignore the click that trails a swipe.
+  function fromSwipe() { return Date.now() - swipeEndedAt < 400; }
+
+  el.board.addEventListener('pointerdown', e => {
+    if (state.solved) return;
+    const tile = e.target.closest('.tile');
+    swipe = {
+      x: e.clientX,
+      y: e.clientY,
+      index: tile ? Number(tile.dataset.index) : -1
+    };
+  });
+
+  el.board.addEventListener('pointerup', e => {
+    if (!swipe) return;
+    const start = swipe;
+    swipe = null;
+
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (Math.hypot(dx, dy) < SWIPE_MIN) return;   // a tap - let the click handler run
+
+    swipeEndedAt = Date.now();
+    applySwipe(dx, dy, start.index);
+  });
+
+  el.board.addEventListener('pointercancel', () => { swipe = null; });
+  el.board.addEventListener('pointerleave', () => { swipe = null; });
+
+  function applySwipe(dx, dy, startIndex) {
+    if (state.solved) return;
+
+    const horizontal = Math.abs(dx) > Math.abs(dy);
+    const gapRow = rowOf(state.gap);
+    const gapCol = colOf(state.gap);
+
+    // Swiping a block that lines up with the gap, in the gap's direction,
+    // pushes that whole run at once.
+    if (startIndex >= 0) {
+      if (horizontal && rowOf(startIndex) === gapRow && startIndex !== state.gap) {
+        const towardGap = state.gap > startIndex ? 1 : -1;
+        if (Math.sign(dx) === towardGap) { slideTo(startIndex, true); return; }
+      }
+      if (!horizontal && colOf(startIndex) === gapCol && startIndex !== state.gap) {
+        const towardGap = state.gap > startIndex ? 1 : -1;
+        if (Math.sign(dy) === towardGap) { slideTo(startIndex, true); return; }
+      }
+    }
+
+    // Otherwise nudge a single block in from the opposite side, like arrow keys.
+    const step = horizontal ? (dx > 0 ? -1 : 1) : (dy > 0 ? -COLS : COLS);
+    const source = state.gap + step;
+
+    if (source < 0 || source >= cellCount()) { rejectSwipe(); return; }
+    if (horizontal && rowOf(source) !== gapRow) { rejectSwipe(); return; }
+
+    slideTo(source, true);
+  }
+
+  function rejectSwipe() {
+    FX.sound.bump();
+    FX.haptics.bump();
+  }
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -466,6 +578,9 @@
   }
 
   /* ---------------- boot ---------------- */
+
+  FX.confetti.attach(el.confetti);
+  if (FX.haptics.supported) el.hapticsWrap.hidden = false;
 
   loadPrefs();
   document.querySelectorAll('.seg-btn').forEach(b => {

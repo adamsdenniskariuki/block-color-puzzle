@@ -1,10 +1,11 @@
-const CACHE = 'bcp-v2';
+const CACHE = 'bcp-v3';
 
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './game.js',
+  './fx.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',

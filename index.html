@@ -30,8 +30,10 @@
     <div class="frame">
       <div id="guide" class="guide" aria-label="Target colour for each column"></div>
       <div class="divider" aria-hidden="true"></div>
-      <div id="board" class="board" role="application" aria-label="Puzzle board. Use arrow keys or tap a block next to the empty slot."></div>
+      <div id="board" class="board" role="application" aria-label="Puzzle board. Swipe, use arrow keys, or tap a block in line with the empty slot."></div>
     </div>
+
+    <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
 
     <div id="win" class="win" hidden>
       <div class="win-card">
@@ -66,6 +68,14 @@
         <input type="checkbox" id="opt-symbols">
         <span>Symbols</span>
       </label>
+      <label class="toggle">
+        <input type="checkbox" id="opt-sound">
+        <span>Sound</span>
+      </label>
+      <label class="toggle" id="opt-haptics-wrap" hidden>
+        <input type="checkbox" id="opt-haptics">
+        <span>Vibrate</span>
+      </label>
     </div>
   </section>
 
@@ -78,6 +88,7 @@
       <li>The <strong>top row is a guide</strong> — it shows the colour each column must end up as.</li>
       <li>Tap any block in the <strong>same row or column</strong> as the empty slot to slide it in.</li>
       <li>A whole run of blocks slides at once, so you can move several with one tap.</li>
+      <li><strong>Swipe</strong> across the board to push blocks in that direction.</li>
       <li>You win when <strong>every block matches the guide colour above its column</strong>.</li>
       <li>One column keeps the empty slot — that colour has one block fewer.</li>
       <li>Arrow keys work too: they push blocks in that direction.</li>
@@ -86,6 +97,7 @@
   </div>
 </div>
 
+<script src="fx.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

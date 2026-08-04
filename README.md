@@ -31,6 +31,7 @@ short; that column ends up holding the empty slot.
 | Action | How |
 | --- | --- |
 | Slide blocks | Tap/click any block in the empty slot's row or column |
+| Swipe | Drag on the board — a swipe toward the empty slot slides the whole run at once |
 | Slide with keyboard | Arrow keys push a block into the empty slot |
 | Undo | **Undo** button — steps back one tap |
 | Reshuffle the same layout | **Restart** — replays the identical starting board |
@@ -38,6 +39,11 @@ short; that column ends up holding the empty slot.
 | Difficulty | Easy (4 rows) / Normal (5) / Hard (6) |
 | Colour hints | Toggle — dims every block that is in the wrong column |
 | Symbols | Toggle — adds a shape to each colour for colourblind play |
+| Sound | Toggle — synthesised slide/bump/win tones, no audio files |
+| Vibrate | Toggle — haptic taps on mobile (hidden where unsupported) |
+
+Solving the board fires a confetti burst. Everything respects
+`prefers-reduced-motion`, which skips the confetti entirely.
 
 Best time is tracked per difficulty in `localStorage`.
 
@@ -72,7 +78,8 @@ To install from your own copy, serve the folder over HTTPS (or a tunnel) and do 
 | --- | --- |
 | `index.html` | Markup and app shell |
 | `styles.css` | Theme, board frame, tile animation |
-| `game.js` | Board model, sliding, win detection, timer, persistence |
+| `game.js` | Board model, sliding, swipes, win detection, timer, persistence |
+| `fx.js` | Sound, haptics and confetti — self-contained, zero assets |
 | `manifest.webmanifest` | PWA metadata |
 | `sw.js` | Offline cache (stale-while-revalidate) |
 | `qr.png`, `qr.svg` | QR code for the live site |
