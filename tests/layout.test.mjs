@@ -24,6 +24,10 @@ const VIEWPORTS = [
   // The short-and-wide case height-aware sizing was written for.
   { name: 'phone landscape', width: 740, height: 360 },
   { name: 'large phone landscape', width: 844, height: 390 },
+  // The narrowest landscape phone still in use. It sits just above the
+  // two-column threshold; at 600px it fell back to stacked and overflowed 67px.
+  { name: 'iPhone SE landscape', width: 568, height: 320 },
+  { name: 'small phone landscape', width: 640, height: 360 },
   { name: 'tablet portrait', width: 768, height: 1024 },
   { name: 'tablet landscape', width: 1024, height: 768 },
   { name: 'desktop', width: 1280, height: 800 }
@@ -248,8 +252,48 @@ test('landscape phones use the two-column layout', async (t) => {
   await context.close();
 });
 
-// Portrait must keep the stacked layout - the two-column rules are scoped to
-// landscape and should never leak into the normal case.
+// The narrowest landscape phone still in common use. It cannot reach a
+// comfortable cell size at six rows, so unlike the test above this only
+// requires that it uses two columns and fits - the matrix covers the overflow.
+test('the narrowest landscape phone still uses two columns', async (t) => {
+  const context = await browser.newContext({ viewport: { width: 568, height: 320 } });
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  await page.goto(`${server.url}/index.html`);
+  await page.waitForFunction(() => Boolean(window.__bcp));
+
+  for (const rows of DIFFICULTIES) {
+    await t.test(`${rows} rows`, async () => {
+      await setDifficulty(page, rows);
+      const m = await measure(page);
+      const beside =
+        m.controls.left >= m.board.right - SLACK ||
+        m.controls.right <= m.board.left + SLACK;
+      assert.ok(beside, 'controls should sit beside the board, not under it');
+    });
+  }
+
+  await context.close();
+});
+
+// The manifest must not lock orientation. "portrait" is respected by installed
+// PWAs, which would make the landscape layout unreachable for the users most
+// likely to need it.
+test('the manifest does not lock the app to portrait', async () => {
+  const response = await fetch(`${server.url}/manifest.webmanifest`);
+  assert.equal(response.status, 200, 'manifest should be served');
+  const manifest = await response.json();
+
+  assert.notEqual(manifest.orientation, 'portrait',
+    'locking portrait would make the landscape layout unreachable once installed');
+  assert.notEqual(manifest.orientation, 'portrait-primary', 'same as above');
+  assert.ok(manifest.icons.some((i) => i.purpose === 'maskable'),
+    'a maskable icon is required for a clean installed icon');
+  assert.ok(manifest.icons.some((i) => i.sizes === '512x512'),
+    'store packaging tools require a 512px icon');
+});
+
 test('portrait keeps the stacked layout', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   context.setDefaultTimeout(10000);

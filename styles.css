@@ -711,7 +711,9 @@ body {
    everything vertically leaves the board squeezed under its minimum tile size.
    Put the board in its own full-height column and stack the chrome beside it.
    verticalBudget() detects this geometrically, so the two stay in step. */
-@media (orientation: landscape) and (max-height: 480px) and (min-width: 600px) {
+/* 520px, not 600: a 568x320 landscape iPhone SE sits between the two, and in
+   the stacked layout it overflows by 67px at six rows. */
+@media (orientation: landscape) and (max-height: 480px) and (min-width: 520px) {
   .app {
     max-width: 900px;
     display: grid;
@@ -720,7 +722,7 @@ body {
     row-gap: 6px;
     /* 1fr, not auto: an auto column would size itself to the board, whose own
        size is derived from the column width. That loop never converges. */
-    grid-template-columns: minmax(0, 1fr) minmax(210px, 280px);
+    grid-template-columns: minmax(0, 1fr) minmax(190px, 280px);
     grid-template-rows: auto auto auto 1fr;
     grid-template-areas:
       "stage topbar"
