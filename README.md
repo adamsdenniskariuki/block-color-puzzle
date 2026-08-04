@@ -162,7 +162,7 @@ npm test
 | `npm test` | Unit and integration — 51 tests, no browser needed |
 | `npm run test:unit` | Pure logic: RNG, formatting, level curve, geometry, solvability |
 | `npm run test:integration` | Real DOM: tapping, keys, undo, hints, modals, modes, persistence |
-| `npm run test:layout` | Sizing in headless Chromium across nine viewports — 42 tests |
+| `npm run test:layout` | Sizing in headless Chromium across eleven viewports — 60 tests |
 | `npm run test:all` | All of the above |
 
 The unit tests cover the parts with no DOM: seeding and the deterministic RNG, time
@@ -184,8 +184,8 @@ queue, so counting ticks makes a test flaky roughly one run in six.
 ### Layout
 
 Sizing needs a real box model, so those tests run in headless Chromium instead. They start
-their own static server on a spare port, then walk nine viewports — from a 320px iPhone SE to a
-1280px desktop, including two landscape phones — at all three difficulties.
+their own static server on a spare port, then walk eleven viewports — from a 320px iPhone SE to a
+1280px desktop, including four landscape phones — at all three difficulties.
 
 They assert invariants, never pixel values. Exact numbers change with any style tweak and prove
 nothing; what matters is that the controls never fall below the fold, the page never scrolls in
@@ -206,10 +206,15 @@ Animations stay untested — they are visual by nature.
 Tests reach the internals through a `window.__bcp` hook that `game.js` only publishes on
 `localhost`, so it is never present on the deployed site.
 
+`AGENTS.md` has the traps that are not obvious from the test code — why `node --test tests/`
+fails, why the difficulty buttons hang a locator, and why two reasonable-looking regression
+tests both passed on genuinely broken CSS.
+
 ## Files
 
 | File | Purpose |
 | --- | --- |
+| `AGENTS.md` | Deploy recipe, test gotchas and CSS traps — read before changing anything |
 | `index.html` | Markup and app shell |
 | `styles.css` | Theme, board frame, tile animation |
 | `game.js` | Board model, sliding, swipes, win detection, timer, persistence |
@@ -268,6 +273,12 @@ waste. So the board takes a full-height column of its own with the header, stats
 stacked beside it, which roughly doubles the tile size. `verticalBudget()` recognises that case
 from geometry — are the controls beside the stage or under it — rather than re-testing the media
 query, so the CSS and the JavaScript cannot fall out of step.
+
+The breakpoint is 520px wide, not 600px, because a 568×320 landscape iPhone SE falls between the
+two: at 600px it dropped back to the stacked layout and overflowed the viewport by 67px at six
+rows. The manifest deliberately does not lock orientation either — an installed PWA honours that
+setting, so `portrait` would make this whole layout unreachable for the users most likely to
+want it.
 
 **Palette and shape are separate axes.** Symbols are keyed to the colour slot rather than bundled
 into the palette, so switching palette can never change what a shape means. Switching repaints the
