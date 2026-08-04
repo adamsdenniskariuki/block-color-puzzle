@@ -5,6 +5,15 @@ A sliding block puzzle inspired by the homemade board game in `../board-game-ima
 Zero dependencies — plain HTML, CSS and JavaScript. Runs offline and installs to a phone
 home screen as a PWA.
 
+## Play it
+
+**[adamsdenniskariuki.github.io/block-color-puzzle](https://adamsdenniskariuki.github.io/block-color-puzzle/)**
+
+Scan to open it on your phone:
+
+<img src="qr.png" alt="QR code linking to the game" width="220">
+
+
 ## The rules
 
 The board is **5 columns wide**. The top row is a **locked colour guide**: it never moves and
@@ -51,8 +60,11 @@ npx --yes serve -l 8123 .
 
 ## Installing on a phone
 
-Serve the folder over HTTPS (or a tunnel), open it in Chrome on Android, then use
-**Add to home screen**. It launches fullscreen and works with no connection.
+Open the [live site](https://adamsdenniskariuki.github.io/block-color-puzzle/) in Chrome on
+Android — scan the QR code above — then use **Add to home screen**. It launches fullscreen and
+works with no connection.
+
+To install from your own copy, serve the folder over HTTPS (or a tunnel) and do the same.
 
 ## Files
 
@@ -63,12 +75,21 @@ Serve the folder over HTTPS (or a tunnel), open it in Chrome on Android, then us
 | `game.js` | Board model, sliding, win detection, timer, persistence |
 | `manifest.webmanifest` | PWA metadata |
 | `sw.js` | Offline cache (stale-while-revalidate) |
+| `qr.png`, `qr.svg` | QR code for the live site |
 | `tools/make-icons.js` | Regenerates the PNG icons — no image libraries needed |
+| `tools/make-qr.js` | Regenerates the QR code (needs `npm i --no-save qrcode`) |
 
 Regenerate icons after changing the artwork:
 
 ```powershell
 node tools/make-icons.js
+```
+
+Regenerate the QR code if the site URL changes:
+
+```powershell
+npm install --no-save qrcode
+node tools/make-qr.js https://your-new-url/
 ```
 
 ## Design notes
