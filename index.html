@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#12161c">
+<meta name="description" content="Slide the coloured blocks so every column matches its guide colour.">
+<title>Block Color Puzzle</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <h1>Block Color Puzzle</h1>
+    <button id="btn-help" class="icon-btn" type="button" aria-label="How to play">?</button>
+  </header>
+
+  <section class="hud" aria-label="Game statistics">
+    <div class="stat"><span class="stat-label">Time</span><span id="stat-time" class="stat-value">0:00</span></div>
+    <div class="stat"><span class="stat-label">Moves</span><span id="stat-moves" class="stat-value">0</span></div>
+    <div class="stat"><span class="stat-label">Best</span><span id="stat-best" class="stat-value">—</span></div>
+  </section>
+
+  <main class="stage">
+    <div class="frame">
+      <div id="guide" class="guide" aria-label="Target colour for each column"></div>
+      <div class="divider" aria-hidden="true"></div>
+      <div id="board" class="board" role="application" aria-label="Puzzle board. Use arrow keys or tap a block next to the empty slot."></div>
+    </div>
+
+    <div id="win" class="win" hidden>
+      <div class="win-card">
+        <div class="win-badge">✓</div>
+        <h2>Solved!</h2>
+        <p id="win-stats" class="win-stats"></p>
+        <p id="win-best" class="win-best" hidden>New best time!</p>
+        <button id="btn-win-new" class="btn primary" type="button">New puzzle</button>
+      </div>
+    </div>
+  </main>
+
+  <section class="controls">
+    <div class="seg" role="group" aria-label="Difficulty">
+      <button class="seg-btn" type="button" data-rows="4">Easy</button>
+      <button class="seg-btn is-active" type="button" data-rows="5">Normal</button>
+      <button class="seg-btn" type="button" data-rows="6">Hard</button>
+    </div>
+
+    <div class="btn-row">
+      <button id="btn-new" class="btn" type="button">New</button>
+      <button id="btn-restart" class="btn" type="button">Restart</button>
+      <button id="btn-undo" class="btn" type="button">Undo</button>
+    </div>
+
+    <div class="toggles">
+      <label class="toggle">
+        <input type="checkbox" id="opt-hints">
+        <span>Highlight misplaced</span>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" id="opt-symbols">
+        <span>Symbols</span>
+      </label>
+    </div>
+  </section>
+
+</div>
+
+<div id="help" class="modal" hidden>
+  <div class="modal-card">
+    <h2>How to play</h2>
+    <ul>
+      <li>The <strong>top row is a guide</strong> — it shows the colour each column must end up as.</li>
+      <li>Tap any block in the <strong>same row or column</strong> as the empty slot to slide it in.</li>
+      <li>A whole run of blocks slides at once, so you can move several with one tap.</li>
+      <li>You win when <strong>every block matches the guide colour above its column</strong>.</li>
+      <li>One column keeps the empty slot — that colour has one block fewer.</li>
+      <li>Arrow keys work too: they push blocks in that direction.</li>
+    </ul>
+    <button id="btn-help-close" class="btn primary" type="button">Got it</button>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
