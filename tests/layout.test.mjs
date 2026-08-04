@@ -265,6 +265,83 @@ test('portrait keeps the stacked layout', async () => {
   await context.close();
 });
 
+// The help modal must fit the smallest phone without scrolling, and its dismiss
+// button must always be reachable. It once held 13 flat bullets, which pushed
+// "Got it" off the card on a 360px screen - you had to scroll to close it.
+for (const vp of [{ name: 'small phone', width: 360, height: 640 },
+                  { name: 'tall phone', width: 390, height: 844 }]) {
+  test(`help modal fits without scrolling on a ${vp.name}`, async () => {
+    const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
+    context.setDefaultTimeout(10000);
+    const page = await context.newPage();
+    await page.route('**/sw.js', (route) => route.abort());
+    await page.goto(`${server.url}/index.html`);
+    await page.waitForFunction(() => Boolean(window.__bcp));
+    await page.click('#btn-help');
+    await settle(page);
+
+    const m = await page.evaluate(() => {
+      const card = document.querySelector('#help .modal-card');
+      const btn = document.getElementById('btn-help-close');
+      const cardRect = card.getBoundingClientRect();
+      const btnRect = btn.getBoundingClientRect();
+      return {
+        overflow: card.scrollHeight - card.clientHeight,
+        btnTop: btnRect.top,
+        btnBottom: btnRect.bottom,
+        cardTop: cardRect.top,
+        cardBottom: cardRect.bottom,
+        sections: document.querySelectorAll('#help details').length,
+        open: document.querySelectorAll('#help details[open]').length,
+      };
+    });
+
+    assert.ok(m.overflow <= SLACK, `help modal should not scroll, overflowed by ${m.overflow}px`);
+    assert.ok(m.btnBottom <= m.cardBottom + SLACK && m.btnTop >= m.cardTop - SLACK,
+      'the "Got it" button must be visible without scrolling');
+    assert.ok(m.sections >= 3, 'reference content should stay in collapsible sections');
+    assert.equal(m.open, 0, 'sections should start collapsed so the modal opens short');
+
+    await context.close();
+  });
+}
+
+// Reopening help must reset the collapsible sections, otherwise the modal grows
+// a little every time the user expands something and comes back to it.
+test('help modal collapses its sections again when reopened', async () => {
+  const context = await browser.newContext({ viewport: { width: 360, height: 640 } });
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  await page.goto(`${server.url}/index.html`);
+  await page.waitForFunction(() => Boolean(window.__bcp));
+
+  await page.click('#btn-help');
+  await page.evaluate(() => {
+    document.querySelectorAll('#help details').forEach((d) => { d.open = true; });
+  });
+  await settle(page);
+
+  const expanded = await page.evaluate(() => {
+    const card = document.querySelector('#help .modal-card');
+    return card.scrollHeight;
+  });
+
+  await page.click('#btn-help-close');
+  await page.click('#btn-help');
+  await settle(page);
+
+  const reopened = await page.evaluate(() => ({
+    open: document.querySelectorAll('#help details[open]').length,
+    height: document.querySelector('#help .modal-card').scrollHeight,
+  }));
+
+  assert.equal(reopened.open, 0, 'sections should be collapsed again on reopen');
+  assert.ok(reopened.height < expanded, 'reopened modal should be shorter than the expanded one');
+
+  await context.close();
+});
+
 // Resizing must settle on a stable size rather than oscillate. verticalBudget()
 // deliberately does not measure the board's own height; if that ever changes it
 // becomes circular, and this is the test that would catch it.
