@@ -12,15 +12,63 @@
 (() => {
   'use strict';
 
-  const COLORS = [
-    { name: 'Red',    hex: '#e53935', sym: '\u25CF' },
-    { name: 'Green',  hex: '#00897b', sym: '\u25B2' },
-    { name: 'Blue',   hex: '#1e88e5', sym: '\u25A0' },
-    { name: 'Purple', hex: '#8e24aa', sym: '\u25C6' },
-    { name: 'Amber',  hex: '#fbc02d', sym: '\u2605' }
-  ];
+  // Symbols are keyed by colour index, not by palette, so switching palette
+  // never changes what a shape means.
+  const SYMBOLS = ['\u25CF', '\u25B2', '\u25A0', '\u25C6', '\u2605'];
 
-  const COLS = COLORS.length;       // one column per colour
+  // Every palette needs five colours that stay distinguishable at tile size.
+  // "Accessible" is the Okabe-Ito set, chosen so the three common forms of
+  // colour blindness still separate all five.
+  const PALETTES = {
+    classic: {
+      name: 'Classic',
+      colours: [
+        { name: 'Red',    hex: '#e53935' },
+        { name: 'Green',  hex: '#00897b' },
+        { name: 'Blue',   hex: '#1e88e5' },
+        { name: 'Purple', hex: '#8e24aa' },
+        { name: 'Amber',  hex: '#fbc02d' }
+      ]
+    },
+    accessible: {
+      name: 'Accessible',
+      colours: [
+        { name: 'Vermillion', hex: '#d55e00' },
+        { name: 'Teal',       hex: '#009e73' },
+        { name: 'Sky',        hex: '#56b4e9' },
+        { name: 'Mauve',      hex: '#cc79a7' },
+        { name: 'Sand',       hex: '#e69f00' }
+      ]
+    },
+    candy: {
+      name: 'Candy',
+      colours: [
+        { name: 'Cherry',     hex: '#ff5d73' },
+        { name: 'Mint',       hex: '#3ddc97' },
+        { name: 'Cornflower', hex: '#5b8cff' },
+        { name: 'Grape',      hex: '#b47aea' },
+        { name: 'Lemon',      hex: '#ffd93d' }
+      ]
+    },
+    ocean: {
+      name: 'Ocean',
+      colours: [
+        { name: 'Coral',   hex: '#ef6f6c' },
+        { name: 'Seafoam', hex: '#1eb896' },
+        { name: 'Deep',    hex: '#2b6cb0' },
+        { name: 'Ink',     hex: '#5a5fb8' },
+        { name: 'Shell',   hex: '#f2c14e' }
+      ]
+    }
+  };
+
+  const APPEARANCES = {
+    dark:     'Dark',
+    midnight: 'Midnight',
+    slate:    'Slate'
+  };
+
+  const COLS = 5;                   // one column per colour
   const STORAGE_KEY = 'bcp.v1';
   const SCRAMBLE_PER_CELL = 24;     // scramble slides, scaled by board size
   const DAILY_ROWS = 5;             // the daily puzzle is always Normal
@@ -63,6 +111,11 @@
     levelsSummary: document.getElementById('levels-summary'),
     help:     document.getElementById('help'),
     settings: document.getElementById('settings'),
+    stats:    document.getElementById('stats'),
+    statsGrid: document.getElementById('stats-grid'),
+    statsSince: document.getElementById('stats-since'),
+    palette:  document.getElementById('palette-row'),
+    appearance: document.getElementById('appearance-row'),
     diffNote: document.getElementById('diff-note'),
     undo:     document.getElementById('btn-undo'),
     hint:     document.getElementById('btn-hint'),
@@ -79,6 +132,8 @@
   const state = {
     rows: 5,
     mode: 'free',     // 'free', 'daily' or 'levels'
+    palette: 'classic',
+    appearance: 'dark',
     dailyKey: null,   // YYYY-MM-DD of the puzzle on the board
     level: 1,         // level on the board when mode is 'levels'
     par: 0,           // move par for the current level
@@ -98,6 +153,144 @@
     hintCell: -1,     // cell the current hint points at, -1 when none
     solved: false
   };
+
+  /* ---------------- palette and appearance ---------------- */
+
+  function palette() {
+    return (PALETTES[state.palette] || PALETTES.classic).colours;
+  }
+
+  function colourHex(i) { return palette()[i].hex; }
+  function colourName(i) { return palette()[i].name; }
+
+  function applyTheme() {
+    const root = document.documentElement;
+    root.dataset.appearance = state.appearance;
+    root.dataset.palette = state.palette;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute('content',
+        getComputedStyle(root).getPropertyValue('--bg').trim() || '#12161c');
+    }
+  }
+
+  // Repaints existing tiles in place so switching palette mid-game does not
+  // disturb the board or the timer.
+  function repaintColours() {
+    renderGuide();
+    for (const tile of state.tiles) {
+      if (!tile) continue;
+      const i = Number(tile.dataset.colour);
+      tile.style.setProperty('--c', colourHex(i));
+      tile.setAttribute('aria-label', colourName(i));
+    }
+  }
+
+  /* ---------------- lifetime stats ---------------- */
+
+  // Everything here is cumulative and mode-scoped. Times are only added on a
+  // solve, so an abandoned board never drags the averages down.
+  function loadStats() {
+    const s = loadStore().stats || {};
+    return {
+      started: s.started || 0,
+      solved:  s.solved || 0,
+      moves:   s.moves || 0,
+      ms:      s.ms || 0,
+      hints:   s.hints || 0,
+      undos:   s.undos || 0,
+      byMode:  s.byMode || {},        // mode -> { started, solved, moves, ms }
+      firstAt: s.firstAt || null
+    };
+  }
+
+  function saveStats(stats) {
+    const store = loadStore();
+    store.stats = stats;
+    saveStore(store);
+  }
+
+  function bumpStats(fields, mode) {
+    const stats = loadStats();
+    if (!stats.firstAt) stats.firstAt = Date.now();
+    const bucket = stats.byMode[mode] || (stats.byMode[mode] = {});
+    for (const [k, v] of Object.entries(fields)) {
+      stats[k] = (stats[k] || 0) + v;
+      bucket[k] = (bucket[k] || 0) + v;
+    }
+    saveStats(stats);
+  }
+
+  function totalStars() {
+    const results = loadLevels().results;
+    return Object.values(results).reduce((sum, r) => sum + (r.stars || 0), 0);
+  }
+
+  function statsRows() {
+    const stats = loadStats();
+    const daily = loadDaily();
+    const levels = loadLevels();
+    const solvedCount = Object.keys(levels.results).length;
+    const rate = stats.started ? Math.round((stats.solved / stats.started) * 100) : 0;
+    const avg = stats.solved ? stats.ms / stats.solved : 0;
+
+    return [
+      ['Puzzles solved', String(stats.solved)],
+      ['Started', String(stats.started)],
+      ['Finish rate', stats.started ? rate + '%' : '\u2014'],
+      ['Total moves', stats.moves.toLocaleString()],
+      ['Time played', formatLong(stats.ms)],
+      ['Average solve', stats.solved ? formatTime(Math.round(avg)) : '\u2014'],
+      ['Hints used', String(stats.hints)],
+      ['Undos', String(stats.undos)],
+      ['Daily streak', String(daily.streak)],
+      ['Best streak', String(daily.best)],
+      ['Dailies solved', String(Object.keys(daily.results).length)],
+      ['Levels cleared', solvedCount + ' / ' + LEVEL_COUNT],
+      ['Stars', totalStars() + ' / ' + LEVEL_COUNT * 3]
+    ];
+  }
+
+  function bestRows() {
+    const store = loadStore();
+    const labels = { 4: 'Easy', 5: 'Normal', 6: 'Hard' };
+    return [4, 5, 6].map(rows => {
+      const best = store['best' + rows];
+      return [labels[rows] + ' best',
+        best ? formatTime(best.ms) + ' \u00b7 ' + best.moves + ' moves' : '\u2014'];
+    });
+  }
+
+  function formatLong(ms) {
+    if (!ms) return '\u2014';
+    const total = Math.round(ms / 1000);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    if (h) return h + 'h ' + m + 'm';
+    if (m) return m + 'm ' + (total % 60) + 's';
+    return total + 's';
+  }
+
+  function renderStats() {
+    const cards = statsRows().concat(bestRows());
+    el.statsGrid.innerHTML = cards
+      .map(([label, value]) =>
+        '<div class="stat-card"><span class="stat-card-label"></span>' +
+        '<span class="stat-card-value"></span></div>')
+      .join('');
+
+    // Values come from storage, so they are written as text rather than markup.
+    const nodes = el.statsGrid.children;
+    cards.forEach(([label, value], i) => {
+      nodes[i].firstChild.textContent = label;
+      nodes[i].lastChild.textContent = value;
+    });
+
+    const stats = loadStats();
+    el.statsSince.textContent = stats.firstAt
+      ? 'Since ' + new Date(stats.firstAt).toLocaleDateString()
+      : 'No games yet \u2014 solve one and this fills in.';
+  }
 
   /* ---------------- persistence ---------------- */
 
@@ -132,6 +325,9 @@
     el.sound.checked = store.sound !== false;
     el.haptics.checked = store.haptics !== false;
     if (store.rows && [4, 5, 6].includes(store.rows)) state.rows = store.rows;
+    if (store.palette && PALETTES[store.palette]) state.palette = store.palette;
+    if (store.appearance && APPEARANCES[store.appearance]) state.appearance = store.appearance;
+    applyTheme();
     applyFxPrefs();
   }
 
@@ -141,6 +337,8 @@
     store.symbols = el.symbols.checked;
     store.sound = el.sound.checked;
     store.haptics = el.haptics.checked;
+    store.palette = state.palette;
+    store.appearance = state.appearance;
     // Daily forces Normal, so it must not clobber the free-play difficulty.
     if (state.mode === 'free') store.rows = state.rows;
     saveStore(store);
@@ -289,7 +487,7 @@
 
   function buildSolved(rng) {
     // Randomise which colour sits above which column so the layout varies.
-    state.guide = shuffled(COLORS.map((_, i) => i), rng);
+    state.guide = shuffled(SYMBOLS.map((_, i) => i), rng);
 
     const board = new Array(cellCount());
     for (let i = 0; i < board.length; i++) board[i] = state.guide[colOf(i)];
@@ -395,6 +593,7 @@
         state.hintCell = cell;
         tile.classList.add('is-hint');
         state.hintsLeft--;
+        bumpStats({ hints: 1 }, state.mode);
         FX.sound.click();
         FX.haptics.slide(1);
       } else {
@@ -411,9 +610,9 @@
     for (let c = 0; c < COLS; c++) {
       const cell = document.createElement('div');
       cell.className = 'guide-cell';
-      cell.style.setProperty('--c', COLORS[state.guide[c]].hex);
-      cell.textContent = el.symbols.checked ? COLORS[state.guide[c]].sym : '';
-      cell.title = COLORS[state.guide[c]].name;
+      cell.style.setProperty('--c', colourHex(state.guide[c]));
+      cell.textContent = el.symbols.checked ? SYMBOLS[state.guide[c]] : '';
+      cell.title = colourName(state.guide[c]);
       el.guide.appendChild(cell);
     }
   }
@@ -437,12 +636,12 @@
       const tile = document.createElement('button');
       tile.type = 'button';
       tile.className = 'tile';
-      tile.style.setProperty('--c', COLORS[colour].hex);
+      tile.style.setProperty('--c', colourHex(colour));
       tile.style.transform = translateFor(i);
       tile.dataset.index = String(i);
       tile.dataset.colour = String(colour);
-      tile.textContent = el.symbols.checked ? COLORS[colour].sym : '';
-      tile.setAttribute('aria-label', COLORS[colour].name);
+      tile.textContent = el.symbols.checked ? SYMBOLS[colour] : '';
+      tile.setAttribute('aria-label', colourName(colour));
       tile.addEventListener('click', () => {
         if (fromSwipe()) return;
         slideTo(Number(tile.dataset.index), true);
@@ -625,6 +824,7 @@
     const target = state.history.pop();
     const moved = slideTo(target, false) || 0;
     state.moves = Math.max(0, state.moves - moved);
+    bumpStats({ undos: 1 }, state.mode);
     FX.sound.click();
     FX.haptics.slide(1);
     updateHud();
@@ -704,6 +904,9 @@
     state.solved = true;
     stopTimer();
     refreshTileState();
+    // A board finished without a recorded move (test harness, or a scramble that
+    // was already solved) would otherwise drag the lifetime average toward zero.
+    if (state.moves > 0) bumpStats({ solved: 1, moves: state.moves, ms: state.elapsed }, state.mode);
 
     el.winStats.textContent = `${formatTime(state.elapsed)}  \u00b7  ${state.moves} moves`;
 
@@ -743,7 +946,7 @@
 
     FX.sound.win();
     FX.haptics.win();
-    FX.confetti.burst(COLORS.map(c => c.hex));
+    FX.confetti.burst(palette().map(c => c.hex));
   }
 
   /* ---------------- sharing ---------------- */
@@ -784,6 +987,7 @@
   /* ---------------- lifecycle ---------------- */
 
   function newGame() {
+    abandonBoard();
     stopTimer();
     state.elapsed = 0;
     state.moves = 0;
@@ -825,10 +1029,20 @@
     renderGuide();
     renderBoard();
     updateHud();
+    bumpStats({ started: 1 }, state.mode);
+  }
+
+  // Moves are banked when a board is solved. A board that is walked away from
+  // still cost the player effort, so flush it once here rather than writing to
+  // storage on every slide.
+  function abandonBoard() {
+    if (state.solved || state.moves <= 0) return;
+    bumpStats({ moves: state.moves }, state.mode);
   }
 
   function restart() {
     if (!state.initial) return;
+    abandonBoard();
     stopTimer();
     state.elapsed = 0;
     state.moves = 0;
@@ -846,6 +1060,82 @@
     renderGuide();
     renderBoard();
     updateHud();
+  }
+
+  /* ---------------- theme pickers ---------------- */
+
+  // Each swatch previews its own palette, so the choice is visible before the
+  // board changes. Switching repaints in place rather than dealing a new board.
+  function buildPalettePicker() {
+    el.palette.innerHTML = '';
+    for (const [id, def] of Object.entries(PALETTES)) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'swatch' + (id === state.palette ? ' is-active' : '');
+      btn.dataset.palette = id;
+      btn.setAttribute('aria-pressed', String(id === state.palette));
+      btn.title = def.name;
+
+      const chips = document.createElement('span');
+      chips.className = 'swatch-chips';
+      for (const colour of def.colours) {
+        const chip = document.createElement('span');
+        chip.style.background = colour.hex;
+        chips.appendChild(chip);
+      }
+
+      const label = document.createElement('span');
+      label.className = 'swatch-name';
+      label.textContent = def.name;
+
+      btn.append(chips, label);
+      btn.addEventListener('click', () => setPalette(id));
+      el.palette.appendChild(btn);
+    }
+  }
+
+  function setPalette(id) {
+    if (!PALETTES[id] || state.palette === id) return;
+    state.palette = id;
+    applyTheme();
+    repaintColours();
+    refreshTileState();
+    savePrefs();
+    syncThemeUi();
+    FX.sound.click();
+  }
+
+  function buildAppearancePicker() {
+    el.appearance.innerHTML = '';
+    for (const [id, name] of Object.entries(APPEARANCES)) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'seg-btn' + (id === state.appearance ? ' is-active' : '');
+      btn.dataset.appearance = id;
+      btn.textContent = name;
+      btn.addEventListener('click', () => setAppearance(id));
+      el.appearance.appendChild(btn);
+    }
+  }
+
+  function setAppearance(id) {
+    if (!APPEARANCES[id] || state.appearance === id) return;
+    state.appearance = id;
+    applyTheme();
+    savePrefs();
+    syncThemeUi();
+    FX.sound.click();
+  }
+
+  function syncThemeUi() {
+    for (const btn of el.palette.children) {
+      const on = btn.dataset.palette === state.palette;
+      btn.classList.toggle('is-active', on);
+      btn.setAttribute('aria-pressed', String(on));
+    }
+    for (const btn of el.appearance.children) {
+      btn.classList.toggle('is-active', btn.dataset.appearance === state.appearance);
+    }
   }
 
   /* ---------------- input wiring ---------------- */
@@ -984,7 +1274,7 @@
     savePrefs();
     renderGuide();
     state.tiles.forEach(tile => {
-      if (tile) tile.textContent = el.symbols.checked ? COLORS[Number(tile.dataset.colour)].sym : '';
+      if (tile) tile.textContent = el.symbols.checked ? SYMBOLS[Number(tile.dataset.colour)] : '';
     });
   });
 
@@ -1001,9 +1291,17 @@
   document.getElementById('btn-settings-close').addEventListener('click', () => { el.settings.hidden = true; });
   el.settings.addEventListener('click', e => { if (e.target === el.settings) el.settings.hidden = true; });
 
+  document.getElementById('btn-stats').addEventListener('click', () => {
+    renderStats();
+    el.stats.hidden = false;
+  });
+  document.getElementById('btn-stats-close').addEventListener('click', () => { el.stats.hidden = true; });
+  el.stats.addEventListener('click', e => { if (e.target === el.stats) el.stats.hidden = true; });
+
   // Arrow keys push a block in the pressed direction, into the gap.
   document.addEventListener('keydown', e => {
     const openModal = !el.levels.hidden ? el.levels
+      : !el.stats.hidden ? el.stats
       : !el.settings.hidden ? el.settings
       : !el.help.hidden ? el.help : null;
     if (openModal) {
@@ -1118,6 +1416,8 @@
   if (FX.haptics.supported) el.hapticsWrap.hidden = false;
 
   loadPrefs();
+  buildPalettePicker();
+  buildAppearancePicker();
   syncModeUi();
   newGame();
 
@@ -1129,7 +1429,9 @@
       loadDaily, recordDaily, shareText,
       loadLevels, saveLevels, recordLevel, starsFor, levelSpec, playLevel,
       openLevelPicker, parFor, misplaced, setMode, newGame, LEVEL_COUNT,
-      showHint, solveFromHere, solverBoard, clearHint, slideTo, HINTS_PER_GAME
+      showHint, solveFromHere, solverBoard, clearHint, slideTo, HINTS_PER_GAME,
+      loadStats, saveStats, bumpStats, renderStats, statsRows, formatLong,
+      setPalette, setAppearance, palette, PALETTES, APPEARANCES
     };
   }
 })();

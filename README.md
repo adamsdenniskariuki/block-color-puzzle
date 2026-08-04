@@ -70,11 +70,33 @@ The solver is a beam search over legal slides, guided by the total column
 distance of every block from its target column. It typically answers in well
 under a tenth of a second.
 
+## Stats and themes
+
+The **📊** button in the topbar opens a lifetime record — puzzles solved, finish
+rate, total moves, time played, average solve, hints and undos, your daily
+streak, levels cleared and stars earned, plus your best run in each difficulty.
+Counters are written only at board boundaries (start, solve, walk-away) rather
+than on every slide, so playing stays cheap.
+
+The settings sheet carries two appearance controls:
+
+- **Colours** — four palettes. `Classic` is the original board, `Accessible` uses
+  the Okabe-Ito set chosen for maximum separation under the common forms of
+  colour blindness, plus `Candy` and `Ocean`. Switching repaints the blocks in
+  place, so your board and timer survive the change.
+- **Appearance** — `Dark`, `Midnight` or `Slate` re-tints the surfaces around the
+  board. The board frame itself stays light in every theme because the block
+  colours are tuned against it.
+
+Symbols are keyed to the colour's *slot*, not the palette, so a shape always
+means the same column no matter which palette you pick. Both choices persist.
+
 ## Controls
 
 Four buttons sit under the board — **Undo**, **Hint**, **Restart**, **New** —
-plus a **⚙** button that opens a settings sheet holding mode, difficulty and the
-four toggles. Those are set-and-forget, so they stay out of the way.
+plus a **⚙** button that opens a settings sheet holding mode, difficulty,
+colours, appearance and the four toggles. Those are set-and-forget, so they stay
+out of the way.
 
 | Action | How |
 | --- | --- |
@@ -85,8 +107,11 @@ four toggles. Those are set-and-forget, so they stay out of the way.
 | Ask for a nudge | **Hint** — rings the next block to move, three per puzzle |
 | Reshuffle the same layout | **Restart** — replays the identical starting board |
 | Fresh puzzle | **New** |
+| Lifetime stats | **📊** in the topbar |
 | Mode | ⚙ — Free play (endless random boards), Daily (one shared puzzle a day), or Levels (24-puzzle campaign) |
 | Difficulty | ⚙ — Easy (4 rows) / Normal (5) / Hard (6) — free play only |
+| Colours | ⚙ — Classic / Accessible / Candy / Ocean |
+| Appearance | ⚙ — Dark / Midnight / Slate |
 | Colour hints | ⚙ toggle — dims every block that is in the wrong column |
 | Symbols | ⚙ toggle — adds a shape to each colour for colourblind play |
 | Sound | ⚙ toggle — synthesised slide/bump/win tones, no audio files |
@@ -171,5 +196,13 @@ since one slide closes at most one unit of it.
 or phone in landscape, or a small desktop window — would otherwise push the buttons below the
 fold. Vertical room is measured from where the board starts and what sits below it, never from the
 board's own height, which would be circular.
+
+**Palette and shape are separate axes.** Symbols are keyed to the colour slot rather than bundled
+into the palette, so switching palette can never change what a shape means. Switching repaints the
+existing blocks instead of dealing a new board, so a mid-game change costs nothing.
+
+**Stats are written at board boundaries only** — start, solve, and walking away from an unfinished
+board — plus hints and undos. Writing to `localStorage` on every slide would be far too chatty. A
+solve with no recorded moves is skipped entirely so it cannot drag the lifetime average toward zero.
 
 Bumping `CACHE` in `sw.js` forces clients onto a new build.
