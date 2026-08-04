@@ -282,11 +282,12 @@ for (const vp of [{ name: 'small phone', width: 360, height: 640 },
 
     const m = await page.evaluate(() => {
       const card = document.querySelector('#help .modal-card');
+      const scroll = document.querySelector('#help .modal-scroll');
       const btn = document.getElementById('btn-help-close');
       const cardRect = card.getBoundingClientRect();
       const btnRect = btn.getBoundingClientRect();
       return {
-        overflow: card.scrollHeight - card.clientHeight,
+        overflow: scroll.scrollHeight - scroll.clientHeight,
         btnTop: btnRect.top,
         btnBottom: btnRect.bottom,
         cardTop: cardRect.top,
@@ -323,8 +324,8 @@ test('help modal collapses its sections again when reopened', async () => {
   await settle(page);
 
   const expanded = await page.evaluate(() => {
-    const card = document.querySelector('#help .modal-card');
-    return card.scrollHeight;
+    const scroll = document.querySelector('#help .modal-scroll');
+    return scroll.scrollHeight;
   });
 
   await page.click('#btn-help-close');
@@ -333,11 +334,101 @@ test('help modal collapses its sections again when reopened', async () => {
 
   const reopened = await page.evaluate(() => ({
     open: document.querySelectorAll('#help details[open]').length,
-    height: document.querySelector('#help .modal-card').scrollHeight,
+    height: document.querySelector('#help .modal-scroll').scrollHeight,
   }));
 
   assert.equal(reopened.open, 0, 'sections should be collapsed again on reopen');
   assert.ok(reopened.height < expanded, 'reopened modal should be shorter than the expanded one');
+
+  await context.close();
+});
+
+// With every section expanded the content scrolls, and the dismiss button must
+// stay opaque. A sticky footer with a partly transparent background let list
+// items show through it.
+//
+// Note both obvious tests are fooled here: elementFromPoint still returns a
+// transparent footer, and .modal-scroll's box ends at the footer even when its
+// content paints past it. The symptom is visual, so the assertion is visual -
+// the footer band must render identically at every scroll position.
+test('help content never shows through the dismiss button', async () => {
+  const context = await browser.newContext({ viewport: { width: 360, height: 640 } });
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  await page.goto(`${server.url}/index.html`);
+  await page.waitForFunction(() => Boolean(window.__bcp));
+
+  await page.click('#btn-help');
+  await page.evaluate(() => {
+    document.querySelectorAll('#help details').forEach((d) => { d.open = true; });
+  });
+  await settle(page);
+
+  const scrollable = await page.evaluate(() => {
+    const s = document.querySelector('#help .modal-scroll');
+    const c = document.querySelector('#help .modal-card');
+    return Math.max(s.scrollHeight - s.clientHeight, c.scrollHeight - c.clientHeight);
+  });
+  assert.ok(scrollable > 40, 'expanding every section should leave something to scroll, or this proves nothing');
+
+  const band = await page.evaluate(() => {
+    const r = document.querySelector('#help .modal-foot').getBoundingClientRect();
+    return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
+  });
+
+  const shots = [];
+  for (const fraction of [0, 0.5, 1]) {
+    await page.evaluate((f) => {
+      for (const sel of ['#help .modal-scroll', '#help .modal-card']) {
+        const n = document.querySelector(sel);
+        n.scrollTop = (n.scrollHeight - n.clientHeight) * f;
+      }
+    }, fraction);
+    await settle(page);
+    shots.push(await page.screenshot({ clip: band }));
+  }
+
+  for (let i = 1; i < shots.length; i += 1) {
+    assert.ok(shots[i].equals(shots[0]),
+      'the footer band changed as the content scrolled - text is showing through the dismiss button');
+  }
+
+  await context.close();
+});
+
+// The button must also be the thing you actually hit when you tap it.
+test('the dismiss button is on top of the help content', async () => {
+  const context = await browser.newContext({ viewport: { width: 360, height: 640 } });
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  await page.goto(`${server.url}/index.html`);
+  await page.waitForFunction(() => Boolean(window.__bcp));
+
+  await page.click('#btn-help');
+  await page.evaluate(() => {
+    document.querySelectorAll('#help details').forEach((d) => { d.open = true; });
+  });
+  await settle(page);
+
+  const hits = await page.evaluate(() => {
+    const rect = document.querySelector('#help .modal-foot').getBoundingClientRect();
+    const found = [];
+    for (let i = 1; i <= 6; i += 1) {
+      const node = document.elementFromPoint(rect.left + rect.width / 2, rect.top + (rect.height * i) / 7);
+      found.push(node ? node.tagName.toLowerCase() : 'none');
+    }
+    return found;
+  });
+
+  for (const tag of hits) {
+    assert.ok(tag === 'div' || tag === 'button', `the footer band hit <${tag}> instead of the button`);
+  }
+
+  await page.click('#btn-help-close');
+  assert.equal(await page.evaluate(() => document.getElementById('help').hidden), true,
+    'clicking Got it should close the modal');
 
   await context.close();
 });

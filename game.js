@@ -1301,8 +1301,8 @@
 
   document.getElementById('btn-help').addEventListener('click', () => {
     el.help.querySelectorAll('details[open]').forEach(d => { d.open = false; });
-    const card = el.help.querySelector('.modal-card');
-    if (card) card.scrollTop = 0;
+    const scroller = el.help.querySelector('.modal-scroll');
+    if (scroller) scroller.scrollTop = 0;
     el.help.hidden = false;
   });
   document.getElementById('btn-help-close').addEventListener('click', () => { el.help.hidden = true; });

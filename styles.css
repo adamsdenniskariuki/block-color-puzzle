@@ -495,13 +495,29 @@ body {
 .help-more > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 .help-more > ul { margin: 0 0 14px; }
 
-/* Sticky so the dismiss button stays reachable without scrolling. */
+/* The card itself stops scrolling; the body scrolls and the footer is a
+   sibling, so content can never pass underneath the dismiss button. */
+.modal-card-split {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+/* min-height: 0 is required, or a flex child refuses to shrink below its
+   content height and the scroll never engages. */
+.modal-scroll {
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
 .modal-foot {
-  position: sticky;
-  bottom: 0;
-  margin: 4px -22px -20px;
+  flex: none;
+  margin: 0 -22px;
   padding: 14px 22px 20px;
-  background: linear-gradient(to bottom, transparent, var(--bg-soft) 40%);
+  background: var(--bg-soft);
+  border-top: 1px solid #2c3542;
 }
 
 /* ---------- settings sheet ---------- */
