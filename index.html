@@ -23,8 +23,10 @@
   <section class="hud" aria-label="Game statistics">
     <div class="stat"><span class="stat-label">Time</span><span id="stat-time" class="stat-value">0:00</span></div>
     <div class="stat"><span class="stat-label">Moves</span><span id="stat-moves" class="stat-value">0</span></div>
-    <div class="stat"><span class="stat-label">Best</span><span id="stat-best" class="stat-value">—</span></div>
+    <div class="stat"><span id="stat-best-label" class="stat-label">Best</span><span id="stat-best" class="stat-value">—</span></div>
   </section>
+
+  <p id="daily-note" class="daily-note" hidden></p>
 
   <main class="stage">
     <div class="frame">
@@ -41,13 +43,22 @@
         <h2>Solved!</h2>
         <p id="win-stats" class="win-stats"></p>
         <p id="win-best" class="win-best" hidden>New best time!</p>
-        <button id="btn-win-new" class="btn primary" type="button">New puzzle</button>
+        <p id="win-streak" class="win-streak" hidden></p>
+        <div class="win-actions">
+          <button id="btn-share" class="btn" type="button" hidden>Share</button>
+          <button id="btn-win-new" class="btn primary" type="button">New puzzle</button>
+        </div>
       </div>
     </div>
   </main>
 
   <section class="controls">
-    <div class="seg" role="group" aria-label="Difficulty">
+    <div class="seg seg-mode" role="group" aria-label="Mode">
+      <button class="seg-btn is-active" type="button" data-mode="free">Free play</button>
+      <button class="seg-btn" type="button" data-mode="daily">Daily</button>
+    </div>
+
+    <div class="seg seg-diff" role="group" aria-label="Difficulty">
       <button class="seg-btn" type="button" data-rows="4">Easy</button>
       <button class="seg-btn is-active" type="button" data-rows="5">Normal</button>
       <button class="seg-btn" type="button" data-rows="6">Hard</button>
@@ -92,6 +103,7 @@
       <li>You win when <strong>every block matches the guide colour above its column</strong>.</li>
       <li>One column keeps the empty slot — that colour has one block fewer.</li>
       <li>Arrow keys work too: they push blocks in that direction.</li>
+      <li><strong>Daily</strong> gives everyone the same puzzle each day — solve it to build a streak.</li>
     </ul>
     <button id="btn-help-close" class="btn primary" type="button">Got it</button>
   </div>

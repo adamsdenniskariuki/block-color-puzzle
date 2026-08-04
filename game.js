@@ -23,6 +23,8 @@
   const COLS = COLORS.length;       // one column per colour
   const STORAGE_KEY = 'bcp.v1';
   const SCRAMBLE_PER_CELL = 24;     // scramble slides, scaled by board size
+  const DAILY_ROWS = 5;             // the daily puzzle is always Normal
+  const SITE_URL = 'https://adamsdenniskariuki.github.io/block-color-puzzle/';
 
   const el = {
     guide:    document.getElementById('guide'),
@@ -30,9 +32,14 @@
     time:     document.getElementById('stat-time'),
     moves:    document.getElementById('stat-moves'),
     best:     document.getElementById('stat-best'),
+    bestLabel: document.getElementById('stat-best-label'),
+    dailyNote: document.getElementById('daily-note'),
     win:      document.getElementById('win'),
     winStats: document.getElementById('win-stats'),
     winBest:  document.getElementById('win-best'),
+    winStreak: document.getElementById('win-streak'),
+    share:    document.getElementById('btn-share'),
+    newBtn:   document.getElementById('btn-new'),
     help:     document.getElementById('help'),
     undo:     document.getElementById('btn-undo'),
     hints:    document.getElementById('opt-hints'),
@@ -47,6 +54,8 @@
 
   const state = {
     rows: 5,
+    mode: 'free',     // 'free' or 'daily'
+    dailyKey: null,   // YYYY-MM-DD of the puzzle on the board
     guide: [],        // COLS entries: target colour index per column
     board: [],        // rows*COLS entries: colour index, or null for the gap
     initial: null,    // snapshot for Restart
@@ -102,7 +111,8 @@
     store.symbols = el.symbols.checked;
     store.sound = el.sound.checked;
     store.haptics = el.haptics.checked;
-    store.rows = state.rows;
+    // Daily forces Normal, so it must not clobber the free-play difficulty.
+    if (state.mode === 'free') store.rows = state.rows;
     saveStore(store);
   }
 
@@ -111,16 +121,85 @@
     FX.haptics.enabled = el.haptics.checked;
   }
 
+  /* ---------------- daily challenge ---------------- */
+
+  // UTC so everyone on the planet gets the same board on the same date.
+  function todayKey() {
+    const d = new Date();
+    return d.getUTCFullYear() + '-' +
+      String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getUTCDate()).padStart(2, '0');
+  }
+
+  function isPreviousDay(earlier, later) {
+    const a = Date.parse(earlier + 'T00:00:00Z');
+    const b = Date.parse(later + 'T00:00:00Z');
+    return b - a === 86400000;
+  }
+
+  function loadDaily() {
+    const d = loadStore().daily || {};
+    return {
+      last: d.last || null,
+      streak: d.streak || 0,
+      best: d.best || 0,
+      results: d.results || {}
+    };
+  }
+
+  function saveDaily(daily) {
+    const store = loadStore();
+    store.daily = daily;
+    saveStore(store);
+  }
+
+  function recordDaily(key, ms, moves) {
+    const daily = loadDaily();
+    if (daily.results[key]) return daily;   // already banked today
+
+    daily.results[key] = { ms, moves };
+    daily.streak = (daily.last && isPreviousDay(daily.last, key)) ? daily.streak + 1 : 1;
+    daily.last = key;
+    daily.best = Math.max(daily.best, daily.streak);
+
+    // Keep the history bounded; nothing reads more than a couple of months back.
+    const keys = Object.keys(daily.results).sort();
+    while (keys.length > 60) delete daily.results[keys.shift()];
+
+    saveDaily(daily);
+    return daily;
+  }
+
+  // A tiny seeded generator so a given date always builds the same board.
+  function seedFrom(text) {
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
   /* ---------------- helpers ---------------- */
 
   const rowOf = i => Math.floor(i / COLS);
   const colOf = i => i % COLS;
   const cellCount = () => state.rows * COLS;
 
-  function shuffled(arr) {
+  function shuffled(arr, rng) {
     const out = arr.slice();
     for (let i = out.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(rng() * (i + 1));
       [out[i], out[j]] = [out[j], out[i]];
     }
     return out;
@@ -135,15 +214,15 @@
 
   /* ---------------- puzzle generation ---------------- */
 
-  function buildSolved() {
+  function buildSolved(rng) {
     // Randomise which colour sits above which column so the layout varies.
-    state.guide = shuffled(COLORS.map((_, i) => i));
+    state.guide = shuffled(COLORS.map((_, i) => i), rng);
 
     const board = new Array(cellCount());
     for (let i = 0; i < board.length; i++) board[i] = state.guide[colOf(i)];
 
     // Remove one block to create the gap; that colour ends up one short.
-    const gap = Math.floor(Math.random() * board.length);
+    const gap = Math.floor(rng() * board.length);
     board[gap] = null;
 
     state.board = board;
@@ -161,13 +240,13 @@
     return out;
   }
 
-  function scramble() {
+  function scramble(rng) {
     const steps = cellCount() * SCRAMBLE_PER_CELL;
     let previousGap = -1;
 
     for (let n = 0; n < steps; n++) {
       const options = neighbours(state.gap).filter(i => i !== previousGap);
-      const pick = options[Math.floor(Math.random() * options.length)];
+      const pick = options[Math.floor(rng() * options.length)];
       previousGap = state.gap;
       state.board[state.gap] = state.board[pick];
       state.board[pick] = null;
@@ -384,8 +463,29 @@
   function updateHud() {
     el.moves.textContent = String(state.moves);
     el.time.textContent = formatTime(state.elapsed);
-    const best = getBest();
-    el.best.textContent = best ? formatTime(best.ms) : '\u2014';
+
+    if (state.mode === 'daily') {
+      const daily = loadDaily();
+      el.bestLabel.textContent = 'Streak';
+      el.best.textContent = daily.streak ? String(daily.streak) : '\u2014';
+    } else {
+      const best = getBest();
+      el.bestLabel.textContent = 'Best';
+      el.best.textContent = best ? formatTime(best.ms) : '\u2014';
+    }
+  }
+
+  function updateDailyNote() {
+    if (state.mode !== 'daily') { el.dailyNote.hidden = true; return; }
+
+    const daily = loadDaily();
+    const done = daily.results[state.dailyKey];
+    const bits = ['<strong>Daily</strong> \u00b7 ' + state.dailyKey];
+    if (done) bits.push('solved in ' + formatTime(done.ms));
+    if (daily.streak) bits.push('streak ' + daily.streak);
+
+    el.dailyNote.innerHTML = bits.join(' \u00b7 ');
+    el.dailyNote.hidden = false;
   }
 
   function finish() {
@@ -393,15 +493,66 @@
     stopTimer();
     refreshTileState();
 
-    const isNewBest = recordBest(state.elapsed, state.moves);
-    el.winStats.textContent = `${formatTime(state.elapsed)}  ·  ${state.moves} moves`;
-    el.winBest.hidden = !isNewBest;
+    el.winStats.textContent = `${formatTime(state.elapsed)}  \u00b7  ${state.moves} moves`;
+
+    if (state.mode === 'daily') {
+      const alreadyDone = !!loadDaily().results[state.dailyKey];
+      const daily = recordDaily(state.dailyKey, state.elapsed, state.moves);
+      el.winBest.hidden = true;
+      el.winStreak.textContent = alreadyDone
+        ? 'Replay \u2014 today was already counted. Streak ' + daily.streak + '.'
+        : 'Streak ' + daily.streak + (daily.best > daily.streak ? ' \u00b7 best ' + daily.best : '');
+      el.winStreak.hidden = false;
+      el.share.hidden = false;
+      el.share.textContent = 'Share';
+      updateDailyNote();
+    } else {
+      el.winBest.hidden = !recordBest(state.elapsed, state.moves);
+      el.winStreak.hidden = true;
+      el.share.hidden = true;
+    }
+
     el.win.hidden = false;
     updateHud();
 
     FX.sound.win();
     FX.haptics.win();
     FX.confetti.burst(COLORS.map(c => c.hex));
+  }
+
+  /* ---------------- sharing ---------------- */
+
+  const SHARE_EMOJI = ['\u{1F7E5}', '\u{1F7E9}', '\u{1F7E6}', '\u{1F7EA}', '\u{1F7E8}'];
+
+  function shareText() {
+    const result = loadDaily().results[state.dailyKey] || { ms: state.elapsed, moves: state.moves };
+    const streak = loadDaily().streak;
+    // The guide order is the day's fingerprint, so the strip differs daily.
+    const strip = state.guide.map(i => SHARE_EMOJI[i]).join('');
+    return [
+      'Block Color Puzzle \u2014 ' + state.dailyKey,
+      strip,
+      formatTime(result.ms) + ' \u00b7 ' + result.moves + ' moves \u00b7 streak ' + streak,
+      SITE_URL
+    ].join('\n');
+  }
+
+  async function shareResult() {
+    const text = shareText();
+
+    if (navigator.share) {
+      try { await navigator.share({ text }); return; }
+      catch { return; }   // cancelled, or the sheet was dismissed
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      el.share.textContent = 'Copied!';
+      setTimeout(() => { el.share.textContent = 'Share'; }, 1600);
+    } catch {
+      el.share.textContent = 'Copy failed';
+      setTimeout(() => { el.share.textContent = 'Share'; }, 1600);
+    }
   }
 
   /* ---------------- lifecycle ---------------- */
@@ -415,15 +566,23 @@
     el.win.hidden = true;
     FX.confetti.clear();
 
-    buildSolved();
-    scramble();
-    if (isSolved()) scramble();
+    const daily = state.mode === 'daily';
+    state.dailyKey = daily ? todayKey() : null;
+    if (daily) state.rows = DAILY_ROWS;
+
+    // Free play rolls fresh every time; the daily is pinned to the date.
+    const rng = daily ? mulberry32(seedFrom('bcp-' + state.dailyKey)) : Math.random;
+
+    buildSolved(rng);
+    scramble(rng);
+    if (isSolved()) scramble(rng);
 
     state.initial = { board: state.board.slice(), gap: state.gap, guide: state.guide.slice() };
 
     renderGuide();
     renderBoard();
     updateHud();
+    updateDailyNote();
   }
 
   function restart() {
@@ -447,14 +606,50 @@
 
   /* ---------------- input wiring ---------------- */
 
+  function setMode(mode) {
+    if (state.mode === mode) return;
+    state.mode = mode;
+
+    if (mode === 'free') {
+      // Restore whatever difficulty the player had chosen for free play.
+      const saved = loadStore().rows;
+      state.rows = [4, 5, 6].includes(saved) ? saved : 5;
+    }
+
+    document.querySelectorAll('.seg-mode .seg-btn').forEach(b => {
+      b.classList.toggle('is-active', b.dataset.mode === mode);
+    });
+    syncModeUi();
+    newGame();
+  }
+
+  // The daily is one fixed board per day, so difficulty and New are locked off.
+  function syncModeUi() {
+    const daily = state.mode === 'daily';
+    document.querySelectorAll('.seg-diff .seg-btn').forEach(b => {
+      b.disabled = daily;
+      b.classList.toggle('is-active', !daily && Number(b.dataset.rows) === state.rows);
+    });
+    el.newBtn.disabled = daily;
+    el.newBtn.title = daily ? 'The daily puzzle is the same for everyone' : '';
+  }
+
+  document.querySelectorAll('.seg-mode .seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => setMode(btn.dataset.mode));
+  });
+
   document.getElementById('btn-new').addEventListener('click', newGame);
   document.getElementById('btn-restart').addEventListener('click', restart);
-  document.getElementById('btn-win-new').addEventListener('click', newGame);
+  document.getElementById('btn-win-new').addEventListener('click', () => {
+    if (state.mode === 'daily') { el.win.hidden = true; FX.confetti.clear(); return; }
+    newGame();
+  });
+  el.share.addEventListener('click', shareResult);
   el.undo.addEventListener('click', undo);
 
-  document.querySelectorAll('.seg-btn').forEach(btn => {
+  document.querySelectorAll('.seg-diff .seg-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('is-active'));
+      document.querySelectorAll('.seg-diff .seg-btn').forEach(b => b.classList.remove('is-active'));
       btn.classList.add('is-active');
       state.rows = Number(btn.dataset.rows);
       savePrefs();
@@ -593,8 +788,12 @@
   if (FX.haptics.supported) el.hapticsWrap.hidden = false;
 
   loadPrefs();
-  document.querySelectorAll('.seg-btn').forEach(b => {
-    b.classList.toggle('is-active', Number(b.dataset.rows) === state.rows);
-  });
+  syncModeUi();
   newGame();
+
+  // Local-only hook so the game can be driven from a test harness.
+  // Never present on the deployed site.
+  if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
+    window.__bcp = { state, finish, loadDaily, recordDaily, shareText, todayKey, isSolved };
+  }
 })();

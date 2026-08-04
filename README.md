@@ -26,6 +26,25 @@ slides across at once — exactly like pushing blocks on the physical board.
 **You win when every block sits in the column matching its guide colour.** One colour is one block
 short; that column ends up holding the empty slot.
 
+## The daily challenge
+
+**Daily** builds one puzzle per UTC date from a seeded generator, so everyone
+gets the same board on the same day. It is always Normal (5 rows), and the
+**New** button is locked so the board cannot be rerolled — **Restart** replays it.
+
+Solving it banks a result and extends your streak. Miss a day and the streak
+resets, but your best streak is kept. **Share** copies a spoiler-free summary:
+
+```
+Block Color Puzzle — 2026-08-04
+🟩🟥🟦🟪🟨
+1:24 · 37 moves · streak 5
+```
+
+The emoji strip is that day's guide-row order, so it is a fingerprint of the
+puzzle without giving the solution away. On phones it opens the native share
+sheet; elsewhere it falls back to the clipboard.
+
 ## Controls
 
 | Action | How |
@@ -36,7 +55,8 @@ short; that column ends up holding the empty slot.
 | Undo | **Undo** button — steps back one tap |
 | Reshuffle the same layout | **Restart** — replays the identical starting board |
 | Fresh puzzle | **New** |
-| Difficulty | Easy (4 rows) / Normal (5) / Hard (6) |
+| Mode | Free play (endless random boards) or Daily (one shared puzzle a day) |
+| Difficulty | Easy (4 rows) / Normal (5) / Hard (6) — free play only |
 | Colour hints | Toggle — dims every block that is in the wrong column |
 | Symbols | Toggle — adds a shape to each colour for colourblind play |
 | Sound | Toggle — synthesised slide/bump/win tones, no audio files |
@@ -45,7 +65,8 @@ short; that column ends up holding the empty slot.
 Solving the board fires a confetti burst. Everything respects
 `prefers-reduced-motion`, which skips the confetti entirely.
 
-Best time is tracked per difficulty in `localStorage`.
+Best time is tracked per difficulty in `localStorage`, alongside your daily
+streak and the last 60 daily results.
 
 ## Running it
 
