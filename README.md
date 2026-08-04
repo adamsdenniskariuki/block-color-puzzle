@@ -153,15 +153,17 @@ The suite boots the real shipped files inside jsdom and drives them the way a pl
 so it tests the deployed code rather than a copy of its logic.
 
 ```powershell
-npm install   # jsdom, the only dependency, and it is dev-only
+npm install   # jsdom and playwright, both dev-only
 npm test
 ```
 
 | Command | What it runs |
 | --- | --- |
-| `npm test` | Everything — 51 tests |
+| `npm test` | Unit and integration — 51 tests, no browser needed |
 | `npm run test:unit` | Pure logic: RNG, formatting, level curve, geometry, solvability |
 | `npm run test:integration` | Real DOM: tapping, keys, undo, hints, modals, modes, persistence |
+| `npm run test:layout` | Sizing in headless Chromium across nine viewports — 42 tests |
+| `npm run test:all` | All of the above |
 
 The unit tests cover the parts with no DOM: seeding and the deterministic RNG, time
 formatting, the streak date maths, the star thresholds, the level difficulty curve, board
@@ -179,9 +181,27 @@ so the button can repaint before the solver blocks the thread — is awaited wit
 rather than a fixed delay. jsdom fires animation frames on a ~16ms timer, not the microtask
 queue, so counting ticks makes a test flaky roughly one run in six.
 
-Two things are deliberately not tested here. jsdom has no layout engine, so anything measured
-with `getBoundingClientRect` — the height-aware tile sizing — stays verified in a real browser.
-Neither are the animations, which are visual by nature.
+### Layout
+
+Sizing needs a real box model, so those tests run in headless Chromium instead. They start
+their own static server on a spare port, then walk nine viewports — from a 320px iPhone SE to a
+1280px desktop, including two landscape phones — at all three difficulties.
+
+They assert invariants, never pixel values. Exact numbers change with any style tweak and prove
+nothing; what matters is that the controls never fall below the fold, the page never scrolls in
+either direction, the cell stays inside its 34–78px clamp, the guide never overlaps the board,
+slots never overlap each other, and every slot sits exactly where the grid arithmetic says it
+should. One test resizes back and forth to prove the sizing converges rather than oscillates,
+which is what would happen if the budget ever started measuring the board it is sizing.
+
+Writing them immediately turned up two real bugs. `verticalBudget()` was adding up the frame's
+padding, gap and divider by hand, but `.frame` is `display:block`, so its `rowGap` was always 0
+and the divider's 16px of margins and the frame's 2px border went unaccounted for — enough to
+push the controls a few pixels off screen at six rows. It now measures the frame's chrome as a
+single leftover instead. Separately, landscape phones could not fit six rows above the 34px
+minimum tile at all, so they now get a two-column layout with the board at full height.
+
+Animations stay untested — they are visual by nature.
 
 Tests reach the internals through a `window.__bcp` hook that `game.js` only publishes on
 `localhost`, so it is never present on the deployed site.
@@ -199,8 +219,10 @@ Tests reach the internals through a `window.__bcp` hook that `game.js` only publ
 | `sw.js` | Offline cache (stale-while-revalidate) |
 | `qr.png`, `qr.svg` | QR code for the live site |
 | `tests/helpers/boot.mjs` | Boots the game in jsdom and stubs the browser APIs it lacks |
+| `tests/helpers/serve.mjs` | Throwaway static server for the layout tests |
 | `tests/unit.test.mjs` | Pure logic tests |
 | `tests/integration.test.mjs` | DOM-driven behaviour tests |
+| `tests/layout.test.mjs` | Sizing tests in headless Chromium |
 | `tools/make-icons.js` | Regenerates the PNG icons — no image libraries needed |
 | `tools/make-qr.js` | Regenerates the QR code (needs `npm i --no-save qrcode`) |
 
@@ -236,7 +258,16 @@ since one slide closes at most one unit of it.
 **The board scales to the viewport height, not just its width.** A short, wide window — a tablet
 or phone in landscape, or a small desktop window — would otherwise push the buttons below the
 fold. Vertical room is measured from where the board starts and what sits below it, never from the
-board's own height, which would be circular.
+board's own height, which would be circular. The frame's own chrome is measured as a single
+leftover — frame height minus guide minus board — rather than added up from padding, border, gap
+and margins, because that list is easy to get wrong and silently drifts when the CSS changes.
+
+**Landscape phones get their own layout.** Below 480px of height there is no way to fit six rows
+above the 34px minimum tile while stacking everything vertically, and all that width goes to
+waste. So the board takes a full-height column of its own with the header, stats and buttons
+stacked beside it, which roughly doubles the tile size. `verticalBudget()` recognises that case
+from geometry — are the controls beside the stage or under it — rather than re-testing the media
+query, so the CSS and the JavaScript cannot fall out of step.
 
 **Palette and shape are separate axes.** Symbols are keyed to the colour slot rather than bundled
 into the palette, so switching palette can never change what a shape means. Switching repaints the

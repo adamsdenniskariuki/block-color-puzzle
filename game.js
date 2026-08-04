@@ -693,21 +693,41 @@
     const appCs = getComputedStyle(app);
     const appGap = parseFloat(appCs.rowGap) || 0;
 
+    // Everything inside the frame that is not the guide or the board: padding,
+    // border, the divider and its margins. Measuring the leftover is far more
+    // robust than adding those up by hand -- .frame is display:block, so its
+    // rowGap is 0 and the real spacing lives in margins that are easy to miss.
+    //
+    // This is not circular. The board's own height is subtracted straight back
+    // out, so the result is pure chrome and does not move when the cell size
+    // does. Before first paint the children measure 0 and the frame is chrome
+    // only, which gives the same answer.
     const frame = el.board.parentElement;
-    const frameCs = getComputedStyle(frame);
-    const framePad = parseFloat(frameCs.paddingTop) + parseFloat(frameCs.paddingBottom);
-    const frameGap = parseFloat(frameCs.rowGap) || 0;
-
-    const divider = frame.querySelector('.divider');
-    const dividerH = divider ? divider.getBoundingClientRect().height : 0;
+    const chrome = frame.getBoundingClientRect().height
+      - el.guide.getBoundingClientRect().height
+      - el.board.getBoundingClientRect().height;
 
     // Where the stage begins is fixed by the header, HUD and note above it.
-    const stageTop = stage.getBoundingClientRect().top + window.scrollY;
-    const below = controls.getBoundingClientRect().height
-      + parseFloat(appCs.paddingBottom)
-      + appGap;
+    const stageRect = stage.getBoundingClientRect();
+    const controlsRect = controls.getBoundingClientRect();
+    const stageTop = stageRect.top + window.scrollY;
 
-    return window.innerHeight - stageTop - below - framePad - dividerH - frameGap * 2 - 10;
+    // In the landscape two-column layout the controls sit beside the stage
+    // rather than under it, so they cost no height. Detect that from geometry
+    // instead of re-testing the media query, so CSS and JS cannot drift apart.
+    // A zero-width stage means we are measuring before first paint; treat that
+    // as stacked, which is the conservative guess.
+    const beside = stageRect.width > 0 && (
+      controlsRect.left >= stageRect.right - 1 ||
+      controlsRect.right <= stageRect.left + 1
+    );
+
+    const below = beside
+      ? parseFloat(appCs.paddingBottom)
+      : controlsRect.height + parseFloat(appCs.paddingBottom) + appGap;
+
+    // 2px absorbs sub-pixel rounding; the terms above are now exact.
+    return window.innerHeight - stageTop - below - chrome - 2;
   }
 
   function translateFor(index) {
