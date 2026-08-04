@@ -288,6 +288,18 @@
 
   /* ---------------- moves ---------------- */
 
+  // Shake a block that cannot go anywhere, so a dead tap still feels answered.
+  function nudge(index) {
+    const tile = state.tiles[index];
+    if (tile) {
+      tile.classList.remove('is-nudge');
+      void tile.offsetWidth;
+      tile.classList.add('is-nudge');
+    }
+    FX.sound.bump();
+    FX.haptics.bump();
+  }
+
   function slideTo(target, record) {
     if (state.solved) return;
     if (target === state.gap) return;
@@ -295,14 +307,7 @@
     const sameRow = rowOf(target) === rowOf(state.gap);
     const sameCol = colOf(target) === colOf(state.gap);
     if (!sameRow && !sameCol) {
-      const tile = state.tiles[target];
-      if (tile) {
-        tile.classList.remove('is-nudge');
-        void tile.offsetWidth;
-        tile.classList.add('is-nudge');
-      }
-      FX.sound.bump();
-      FX.haptics.bump();
+      nudge(target);
       return;
     }
 
@@ -543,20 +548,25 @@
     const gapRow = rowOf(state.gap);
     const gapCol = colOf(state.gap);
 
-    // Swiping a block that lines up with the gap, in the gap's direction,
-    // pushes that whole run at once.
+    // A drag that starts on a block only ever moves that block's own run.
+    // If the block cannot reach the gap, nothing else on the board may move -
+    // otherwise dragging a dead tile would shove some unrelated block instead.
     if (startIndex >= 0) {
-      if (horizontal && rowOf(startIndex) === gapRow && startIndex !== state.gap) {
-        const towardGap = state.gap > startIndex ? 1 : -1;
-        if (Math.sign(dx) === towardGap) { slideTo(startIndex, true); return; }
-      }
-      if (!horizontal && colOf(startIndex) === gapCol && startIndex !== state.gap) {
-        const towardGap = state.gap > startIndex ? 1 : -1;
-        if (Math.sign(dy) === towardGap) { slideTo(startIndex, true); return; }
-      }
+      if (startIndex === state.gap) return;
+
+      const aligned = horizontal
+        ? rowOf(startIndex) === gapRow
+        : colOf(startIndex) === gapCol;
+      if (!aligned) { nudge(startIndex); return; }
+
+      const towardGap = state.gap > startIndex ? 1 : -1;
+      if (Math.sign(horizontal ? dx : dy) !== towardGap) { nudge(startIndex); return; }
+
+      slideTo(startIndex, true);
+      return;
     }
 
-    // Otherwise nudge a single block in from the opposite side, like arrow keys.
+    // Swiping empty board space pushes one block in, exactly like the arrow keys.
     const step = horizontal ? (dx > 0 ? -1 : 1) : (dy > 0 ? -COLS : COLS);
     const source = state.gap + step;
 
