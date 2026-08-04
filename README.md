@@ -147,6 +147,40 @@ works with no connection.
 
 To install from your own copy, serve the folder over HTTPS (or a tunnel) and do the same.
 
+## Tests
+
+The suite boots the real shipped files inside jsdom and drives them the way a player would,
+so it tests the deployed code rather than a copy of its logic.
+
+```powershell
+npm install   # jsdom, the only dependency, and it is dev-only
+npm test
+```
+
+| Command | What it runs |
+| --- | --- |
+| `npm test` | Everything — 50 tests |
+| `npm run test:unit` | Pure logic: RNG, formatting, level curve, geometry, solvability |
+| `npm run test:integration` | Real DOM: tapping, keys, undo, hints, modals, modes, persistence |
+
+The unit tests cover the parts with no DOM: seeding and the deterministic RNG, time
+formatting, the streak date maths, the star thresholds, the level difficulty curve, board
+geometry, and the solvability invariant — a board is built solved and scrambled only by legal
+slides, so a solver replay must always finish it.
+
+The integration tests click and type: they slide blocks, check a run slide counts blocks
+rather than taps, undo it in one step, spend all three hints, open each modal and close it
+with Escape, switch palette and confirm the board is repainted in place rather than reshuffled,
+play the daily and a level through to a win, and reboot from saved storage to prove
+preferences, stats and progress survive.
+
+Two things are deliberately not tested here. jsdom has no layout engine, so anything measured
+with `getBoundingClientRect` — the height-aware tile sizing — stays verified in a real browser.
+Neither are the animations, which are visual by nature.
+
+Tests reach the internals through a `window.__bcp` hook that `game.js` only publishes on
+`localhost`, so it is never present on the deployed site.
+
 ## Files
 
 | File | Purpose |
@@ -159,6 +193,9 @@ To install from your own copy, serve the folder over HTTPS (or a tunnel) and do 
 | `manifest.webmanifest` | PWA metadata |
 | `sw.js` | Offline cache (stale-while-revalidate) |
 | `qr.png`, `qr.svg` | QR code for the live site |
+| `tests/helpers/boot.mjs` | Boots the game in jsdom and stubs the browser APIs it lacks |
+| `tests/unit.test.mjs` | Pure logic tests |
+| `tests/integration.test.mjs` | DOM-driven behaviour tests |
 | `tools/make-icons.js` | Regenerates the PNG icons — no image libraries needed |
 | `tools/make-qr.js` | Regenerates the QR code (needs `npm i --no-save qrcode`) |
 
@@ -203,5 +240,12 @@ existing blocks instead of dealing a new board, so a mid-game change costs nothi
 **Stats are written at board boundaries only** — start, solve, and walking away from an unfinished
 board — plus hints and undos. Writing to `localStorage` on every slide would be far too chatty. A
 solve with no recorded moves is skipped entirely so it cannot drag the lifetime average toward zero.
+
+**The tests run the shipped files, not a copy.** Extracting the logic into a shared module to make
+it importable would have meant testing something the browser never loads. Instead `game.js`
+publishes a `window.__bcp` hook on `localhost` only, and the test harness boots jsdom at
+`127.0.0.1` to switch it on. The three browser APIs jsdom lacks — `matchMedia`, `AudioContext` and
+a canvas 2D context — are stubbed in the harness; nothing in the game is stubbed or branched for
+tests.
 
 Bumping `CACHE` in `sw.js` forces clients onto a new build.

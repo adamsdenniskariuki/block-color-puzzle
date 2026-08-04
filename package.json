@@ -1,0 +1,19 @@
+{
+  "name": "block-color-puzzle",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A sliding-block colour-sorting puzzle, built as an installable PWA.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/*.test.mjs\"",
+    "test:unit": "node --test tests/unit.test.mjs",
+    "test:integration": "node --test tests/integration.test.mjs",
+    "serve": "npx --yes http-server -p 8123 -c-1 ."
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

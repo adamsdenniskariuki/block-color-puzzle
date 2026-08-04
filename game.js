@@ -1426,13 +1426,18 @@
   // Never present on the deployed site.
   if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
     window.__bcp = {
-      state, finish, isSolved, todayKey,
+      state, el, finish, isSolved, todayKey, isPreviousDay,
       loadDaily, recordDaily, shareText,
       loadLevels, saveLevels, recordLevel, starsFor, levelSpec, playLevel,
-      openLevelPicker, parFor, misplaced, setMode, newGame, LEVEL_COUNT,
+      openLevelPicker, parFor, misplaced, setMode, newGame, restart, LEVEL_COUNT,
       showHint, solveFromHere, solverBoard, clearHint, slideTo, HINTS_PER_GAME,
-      loadStats, saveStats, bumpStats, renderStats, statsRows, formatLong,
-      setPalette, setAppearance, palette, PALETTES, APPEARANCES
+      loadStats, saveStats, bumpStats, renderStats, statsRows, bestRows,
+      formatLong, formatTime, totalStars,
+      setPalette, setAppearance, palette, colourHex, PALETTES, APPEARANCES,
+      loadStore, saveStore, getBest, recordBest, loadPrefs, savePrefs,
+      seedFrom, mulberry32, shuffled, neighbours, buildSolved, scramble,
+      renderBoard, renderGuide, layout,
+      undo, applySwipe, syncHintButton, COLS, STORAGE_KEY, SCRAMBLE_PER_CELL
     };
   }
 })();
