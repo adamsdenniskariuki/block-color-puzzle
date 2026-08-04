@@ -45,6 +45,21 @@ The emoji strip is that day's guide-row order, so it is a fingerprint of the
 puzzle without giving the solution away. On phones it opens the native share
 sheet; elsewhere it falls back to the clipboard.
 
+## Levels
+
+**Levels** is a 24-puzzle campaign. Difficulty climbs in three blocks of eight:
+the board grows from 4 rows to 6, and within each block the scramble depth ramps
+geometrically from a handful of slides to a full random shuffle. Every level is
+seeded by its number, so it is the same puzzle for everyone, every time.
+
+Each level carries a **move par**. Beat it for three stars, stay within about
+1.6× for two, finish at all for one. Solving a level unlocks the next, and your
+best attempt is kept — a sloppy replay never costs you stars.
+
+> The par is currently derived from the number of misplaced blocks, which is a
+> true lower bound but only an estimate of the real optimum. It will be replaced
+> with an exact figure once the solver lands.
+
 ## Controls
 
 | Action | How |
@@ -55,7 +70,7 @@ sheet; elsewhere it falls back to the clipboard.
 | Undo | **Undo** button — steps back one tap |
 | Reshuffle the same layout | **Restart** — replays the identical starting board |
 | Fresh puzzle | **New** |
-| Mode | Free play (endless random boards) or Daily (one shared puzzle a day) |
+| Mode | Free play (endless random boards), Daily (one shared puzzle a day), or Levels (24-puzzle campaign) |
 | Difficulty | Easy (4 rows) / Normal (5) / Hard (6) — free play only |
 | Colour hints | Toggle — dims every block that is in the wrong column |
 | Symbols | Toggle — adds a shape to each colour for colourblind play |

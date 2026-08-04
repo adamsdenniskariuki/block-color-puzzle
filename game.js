@@ -24,7 +24,20 @@
   const STORAGE_KEY = 'bcp.v1';
   const SCRAMBLE_PER_CELL = 24;     // scramble slides, scaled by board size
   const DAILY_ROWS = 5;             // the daily puzzle is always Normal
+  const LEVEL_COUNT = 24;           // campaign length
   const SITE_URL = 'https://adamsdenniskariuki.github.io/block-color-puzzle/';
+
+  // A level is defined by its board size and how far it is scrambled.
+  // Depth climbs geometrically within each block of eight, so level 1 is a
+  // handful of slides and level 8 is as random as free play, then the board
+  // grows and the ramp starts again.
+  function levelSpec(n) {
+    const rows = n <= 8 ? 4 : n <= 16 ? 5 : 6;
+    const cells = rows * COLS;
+    const step = ((n - 1) % 8) / 7;                 // 0 .. 1 across the block
+    const factor = 0.3 * Math.pow(SCRAMBLE_PER_CELL / 0.3, step);
+    return { rows, depth: Math.max(4, Math.round(cells * factor)) };
+  }
 
   const el = {
     guide:    document.getElementById('guide'),
@@ -33,13 +46,18 @@
     moves:    document.getElementById('stat-moves'),
     best:     document.getElementById('stat-best'),
     bestLabel: document.getElementById('stat-best-label'),
-    dailyNote: document.getElementById('daily-note'),
+    modeNote: document.getElementById('mode-note'),
     win:      document.getElementById('win'),
     winStats: document.getElementById('win-stats'),
     winBest:  document.getElementById('win-best'),
     winStreak: document.getElementById('win-streak'),
+    winStars: document.getElementById('win-stars'),
+    winNew:   document.getElementById('btn-win-new'),
     share:    document.getElementById('btn-share'),
     newBtn:   document.getElementById('btn-new'),
+    levels:   document.getElementById('levels'),
+    levelsGrid: document.getElementById('levels-grid'),
+    levelsSummary: document.getElementById('levels-summary'),
     help:     document.getElementById('help'),
     undo:     document.getElementById('btn-undo'),
     hints:    document.getElementById('opt-hints'),
@@ -54,8 +72,10 @@
 
   const state = {
     rows: 5,
-    mode: 'free',     // 'free' or 'daily'
+    mode: 'free',     // 'free', 'daily' or 'levels'
     dailyKey: null,   // YYYY-MM-DD of the puzzle on the board
+    level: 1,         // level on the board when mode is 'levels'
+    par: 0,           // move par for the current level
     guide: [],        // COLS entries: target colour index per column
     board: [],        // rows*COLS entries: colour index, or null for the gap
     initial: null,    // snapshot for Restart
@@ -170,6 +190,49 @@
     return daily;
   }
 
+  /* ---------------- level campaign ---------------- */
+
+  function loadLevels() {
+    const saved = loadStore().levels || {};
+    return {
+      unlocked: Math.min(Math.max(saved.unlocked || 1, 1), LEVEL_COUNT),
+      current: Math.min(Math.max(saved.current || 1, 1), LEVEL_COUNT),
+      results: saved.results || {}     // level number -> { stars, moves, ms }
+    };
+  }
+
+  function saveLevels(levels) {
+    const store = loadStore();
+    store.levels = levels;
+    saveStore(store);
+  }
+
+  // Three stars for beating par, two for staying close, one for finishing.
+  function starsFor(moves, par) {
+    if (moves <= par) return 3;
+    if (moves <= Math.round(par * 1.6)) return 2;
+    return 1;
+  }
+
+  function recordLevel(n, ms, moves, par) {
+    const levels = loadLevels();
+    const stars = starsFor(moves, par);
+    const previous = levels.results[n];
+
+    // Keep the player's best attempt rather than the most recent one.
+    if (!previous || stars > previous.stars || (stars === previous.stars && moves < previous.moves)) {
+      levels.results[n] = { stars, moves, ms };
+    }
+    levels.unlocked = Math.max(levels.unlocked, Math.min(n + 1, LEVEL_COUNT));
+    saveLevels(levels);
+    return { stars, best: levels.results[n], improved: !previous || stars > previous.stars };
+  }
+
+  function totalStars() {
+    const results = loadLevels().results;
+    return Object.keys(results).reduce((sum, k) => sum + results[k].stars, 0);
+  }
+
   // A tiny seeded generator so a given date always builds the same board.
   function seedFrom(text) {
     let h = 2166136261 >>> 0;
@@ -240,11 +303,11 @@
     return out;
   }
 
-  function scramble(rng) {
-    const steps = cellCount() * SCRAMBLE_PER_CELL;
+  function scramble(rng, steps) {
+    const total = steps || cellCount() * SCRAMBLE_PER_CELL;
     let previousGap = -1;
 
-    for (let n = 0; n < steps; n++) {
+    for (let n = 0; n < total; n++) {
       const options = neighbours(state.gap).filter(i => i !== previousGap);
       const pick = options[Math.floor(rng() * options.length)];
       previousGap = state.gap;
@@ -261,6 +324,23 @@
       if (v !== state.guide[colOf(i)]) return false;
     }
     return true;
+  }
+
+  function misplaced() {
+    let n = 0;
+    for (let i = 0; i < state.board.length; i++) {
+      const v = state.board[i];
+      if (v !== null && v !== state.guide[colOf(i)]) n++;
+    }
+    return n;
+  }
+
+  // Every misplaced block has to move at least once, so the count is a genuine
+  // lower bound. The multiplier covers the slides spent shuffling blocks out of
+  // the way; it is a heuristic and will be replaced with a real optimal count
+  // once the solver lands.
+  function parFor() {
+    return Math.max(10, Math.round(misplaced() * 2.4));
   }
 
   /* ---------------- rendering ---------------- */
@@ -468,6 +548,9 @@
       const daily = loadDaily();
       el.bestLabel.textContent = 'Streak';
       el.best.textContent = daily.streak ? String(daily.streak) : '\u2014';
+    } else if (state.mode === 'levels') {
+      el.bestLabel.textContent = 'Par';
+      el.best.textContent = String(state.par);
     } else {
       const best = getBest();
       el.bestLabel.textContent = 'Best';
@@ -475,17 +558,37 @@
     }
   }
 
-  function updateDailyNote() {
-    if (state.mode !== 'daily') { el.dailyNote.hidden = true; return; }
+  function starMarkup(stars) {
+    let out = '';
+    for (let i = 1; i <= 3; i++) {
+      out += '<span class="' + (i <= stars ? 'earned' : 'missed') + '">\u2605</span>';
+    }
+    return out;
+  }
 
-    const daily = loadDaily();
-    const done = daily.results[state.dailyKey];
-    const bits = ['<strong>Daily</strong> \u00b7 ' + state.dailyKey];
-    if (done) bits.push('solved in ' + formatTime(done.ms));
-    if (daily.streak) bits.push('streak ' + daily.streak);
+  function updateModeNote() {
+    if (state.mode === 'daily') {
+      const daily = loadDaily();
+      const done = daily.results[state.dailyKey];
+      const bits = ['<strong>Daily</strong> \u00b7 ' + state.dailyKey];
+      if (done) bits.push('solved in ' + formatTime(done.ms));
+      if (daily.streak) bits.push('streak ' + daily.streak);
+      el.modeNote.innerHTML = bits.join(' \u00b7 ');
+      el.modeNote.hidden = false;
+      return;
+    }
 
-    el.dailyNote.innerHTML = bits.join(' \u00b7 ');
-    el.dailyNote.hidden = false;
+    if (state.mode === 'levels') {
+      const best = loadLevels().results[state.level];
+      const bits = ['<strong>Level ' + state.level + '</strong> of ' + LEVEL_COUNT,
+        'par ' + state.par + ' moves'];
+      if (best) bits.push(starMarkup(best.stars) + ' best ' + best.moves);
+      el.modeNote.innerHTML = bits.join(' \u00b7 ');
+      el.modeNote.hidden = false;
+      return;
+    }
+
+    el.modeNote.hidden = true;
   }
 
   function finish() {
@@ -499,16 +602,30 @@
       const alreadyDone = !!loadDaily().results[state.dailyKey];
       const daily = recordDaily(state.dailyKey, state.elapsed, state.moves);
       el.winBest.hidden = true;
+      el.winStars.hidden = true;
       el.winStreak.textContent = alreadyDone
         ? 'Replay \u2014 today was already counted. Streak ' + daily.streak + '.'
         : 'Streak ' + daily.streak + (daily.best > daily.streak ? ' \u00b7 best ' + daily.best : '');
       el.winStreak.hidden = false;
       el.share.hidden = false;
       el.share.textContent = 'Share';
-      updateDailyNote();
+      updateModeNote();
+    } else if (state.mode === 'levels') {
+      const outcome = recordLevel(state.level, state.elapsed, state.moves, state.par);
+      el.winBest.hidden = true;
+      el.winStreak.textContent = outcome.stars === 3
+        ? 'Beat par of ' + state.par + ' moves!'
+        : 'Par is ' + state.par + ' moves \u00b7 best ' + outcome.best.moves;
+      el.winStreak.hidden = false;
+      el.winStars.innerHTML = starMarkup(outcome.stars);
+      el.winStars.hidden = false;
+      el.share.hidden = true;
+      el.winNew.textContent = state.level < LEVEL_COUNT ? 'Next level' : 'Level select';
+      updateModeNote();
     } else {
       el.winBest.hidden = !recordBest(state.elapsed, state.moves);
       el.winStreak.hidden = true;
+      el.winStars.hidden = true;
       el.share.hidden = true;
     }
 
@@ -567,22 +684,34 @@
     FX.confetti.clear();
 
     const daily = state.mode === 'daily';
+    const levels = state.mode === 'levels';
     state.dailyKey = daily ? todayKey() : null;
     if (daily) state.rows = DAILY_ROWS;
 
-    // Free play rolls fresh every time; the daily is pinned to the date.
-    const rng = daily ? mulberry32(seedFrom('bcp-' + state.dailyKey)) : Math.random;
+    let depth = 0;
+    if (levels) {
+      const spec = levelSpec(state.level);
+      state.rows = spec.rows;
+      depth = spec.depth;
+    }
+
+    // Free play rolls fresh every time; the daily and each level are pinned to
+    // a seed, so they rebuild the same board every visit.
+    const rng = daily ? mulberry32(seedFrom('bcp-' + state.dailyKey))
+      : levels ? mulberry32(seedFrom('bcp-level-' + state.level))
+      : Math.random;
 
     buildSolved(rng);
-    scramble(rng);
-    if (isSolved()) scramble(rng);
+    scramble(rng, depth);
+    if (isSolved()) scramble(rng, depth || undefined);
 
+    state.par = levels ? parFor() : 0;
     state.initial = { board: state.board.slice(), gap: state.gap, guide: state.guide.slice() };
 
     renderGuide();
     renderBoard();
     updateHud();
-    updateDailyNote();
+    updateModeNote();
   }
 
   function restart() {
@@ -616,6 +745,8 @@
       state.rows = [4, 5, 6].includes(saved) ? saved : 5;
     }
 
+    if (mode === 'levels') state.level = loadLevels().current;
+
     document.querySelectorAll('.seg-mode .seg-btn').forEach(b => {
       b.classList.toggle('is-active', b.dataset.mode === mode);
     });
@@ -623,25 +754,85 @@
     newGame();
   }
 
-  // The daily is one fixed board per day, so difficulty and New are locked off.
+  // Neither the daily nor a level is rerollable, so difficulty is locked off in
+  // both. In levels mode the New button becomes the level picker instead.
   function syncModeUi() {
-    const daily = state.mode === 'daily';
+    const free = state.mode === 'free';
+    const levels = state.mode === 'levels';
+
     document.querySelectorAll('.seg-diff .seg-btn').forEach(b => {
-      b.disabled = daily;
-      b.classList.toggle('is-active', !daily && Number(b.dataset.rows) === state.rows);
+      b.disabled = !free;
+      b.classList.toggle('is-active', free && Number(b.dataset.rows) === state.rows);
     });
-    el.newBtn.disabled = daily;
-    el.newBtn.title = daily ? 'The daily puzzle is the same for everyone' : '';
+
+    el.newBtn.disabled = state.mode === 'daily';
+    el.newBtn.textContent = levels ? 'Levels' : 'New';
+    el.newBtn.title = state.mode === 'daily' ? 'The daily puzzle is the same for everyone' : '';
+    el.winNew.textContent = levels ? 'Next level' : 'New puzzle';
+  }
+
+  function playLevel(n) {
+    state.level = Math.min(Math.max(n, 1), LEVEL_COUNT);
+    const levels = loadLevels();
+    levels.current = state.level;
+    saveLevels(levels);
+    newGame();
+  }
+
+  function renderLevelPicker() {
+    const levels = loadLevels();
+    el.levelsGrid.innerHTML = '';
+
+    for (let n = 1; n <= LEVEL_COUNT; n++) {
+      const result = levels.results[n];
+      const locked = n > levels.unlocked;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'level-btn';
+      btn.disabled = locked;
+      btn.classList.toggle('is-current', n === state.level && !locked);
+      btn.innerHTML = '<span class="level-num">' + (locked ? '\u{1F512}' : n) + '</span>' +
+        '<span class="level-stars">' + (result ? starMarkup(result.stars) : '') + '</span>';
+      btn.setAttribute('aria-label', locked ? 'Level ' + n + ', locked'
+        : 'Level ' + n + (result ? ', ' + result.stars + ' stars' : ', not yet solved'));
+      btn.addEventListener('click', () => {
+        el.levels.hidden = true;
+        playLevel(n);
+      });
+      el.levelsGrid.appendChild(btn);
+    }
+
+    el.levelsSummary.innerHTML = '<strong>' + totalStars() + '</strong> of ' +
+      (LEVEL_COUNT * 3) + ' stars \u00b7 ' + levels.unlocked + ' of ' + LEVEL_COUNT + ' unlocked';
+  }
+
+  function openLevelPicker() {
+    renderLevelPicker();
+    el.levels.hidden = false;
   }
 
   document.querySelectorAll('.seg-mode .seg-btn').forEach(btn => {
     btn.addEventListener('click', () => setMode(btn.dataset.mode));
   });
 
-  document.getElementById('btn-new').addEventListener('click', newGame);
+  document.getElementById('btn-new').addEventListener('click', () => {
+    if (state.mode === 'levels') { openLevelPicker(); return; }
+    newGame();
+  });
   document.getElementById('btn-restart').addEventListener('click', restart);
+  document.getElementById('btn-levels-close').addEventListener('click', () => { el.levels.hidden = true; });
+  el.levels.addEventListener('click', e => { if (e.target === el.levels) el.levels.hidden = true; });
+
   document.getElementById('btn-win-new').addEventListener('click', () => {
     if (state.mode === 'daily') { el.win.hidden = true; FX.confetti.clear(); return; }
+    if (state.mode === 'levels') {
+      el.win.hidden = true;
+      FX.confetti.clear();
+      if (state.level < LEVEL_COUNT) playLevel(state.level + 1);
+      else openLevelPicker();
+      return;
+    }
     newGame();
   });
   el.share.addEventListener('click', shareResult);
@@ -682,6 +873,13 @@
 
   // Arrow keys push a block in the pressed direction, into the gap.
   document.addEventListener('keydown', e => {
+    const openModal = !el.levels.hidden ? el.levels : !el.help.hidden ? el.help : null;
+    if (openModal) {
+      // A modal owns the keyboard while it is up, so the board must not move.
+      if (e.key === 'Escape') { openModal.hidden = true; e.preventDefault(); }
+      return;
+    }
+
     const map = {
       ArrowRight: -1,
       ArrowLeft:  1,
@@ -794,6 +992,11 @@
   // Local-only hook so the game can be driven from a test harness.
   // Never present on the deployed site.
   if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
-    window.__bcp = { state, finish, loadDaily, recordDaily, shareText, todayKey, isSolved };
+    window.__bcp = {
+      state, finish, isSolved, todayKey,
+      loadDaily, recordDaily, shareText,
+      loadLevels, saveLevels, recordLevel, starsFor, levelSpec, playLevel,
+      openLevelPicker, parFor, misplaced, setMode, newGame, LEVEL_COUNT
+    };
   }
 })();

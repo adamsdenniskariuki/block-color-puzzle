@@ -26,7 +26,7 @@
     <div class="stat"><span id="stat-best-label" class="stat-label">Best</span><span id="stat-best" class="stat-value">—</span></div>
   </section>
 
-  <p id="daily-note" class="daily-note" hidden></p>
+  <p id="mode-note" class="mode-note" hidden></p>
 
   <main class="stage">
     <div class="frame">
@@ -44,6 +44,7 @@
         <p id="win-stats" class="win-stats"></p>
         <p id="win-best" class="win-best" hidden>New best time!</p>
         <p id="win-streak" class="win-streak" hidden></p>
+        <p id="win-stars" class="win-stars" hidden></p>
         <div class="win-actions">
           <button id="btn-share" class="btn" type="button" hidden>Share</button>
           <button id="btn-win-new" class="btn primary" type="button">New puzzle</button>
@@ -56,6 +57,7 @@
     <div class="seg seg-mode" role="group" aria-label="Mode">
       <button class="seg-btn is-active" type="button" data-mode="free">Free play</button>
       <button class="seg-btn" type="button" data-mode="daily">Daily</button>
+      <button class="seg-btn" type="button" data-mode="levels">Levels</button>
     </div>
 
     <div class="seg seg-diff" role="group" aria-label="Difficulty">
@@ -108,8 +110,18 @@
       <li>One column keeps the empty slot — that colour has one block fewer.</li>
       <li>Arrow keys work too: they push blocks in that direction.</li>
       <li><strong>Daily</strong> gives everyone the same puzzle each day — solve it to build a streak.</li>
+      <li><strong>Levels</strong> is a campaign of 24 puzzles that grow from a nudge to a full scramble. Beat the move par for three stars.</li>
     </ul>
     <button id="btn-help-close" class="btn primary" type="button">Got it</button>
+  </div>
+</div>
+
+<div id="levels" class="modal" hidden>
+  <div class="modal-card">
+    <h2>Levels</h2>
+    <p id="levels-summary" class="levels-summary"></p>
+    <div id="levels-grid" class="levels-grid"></div>
+    <button id="btn-levels-close" class="btn primary" type="button">Close</button>
   </div>
 </div>
 
