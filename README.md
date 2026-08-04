@@ -56,11 +56,25 @@ Each level carries a **move par**. Beat it for three stars, stay within about
 1.6× for two, finish at all for one. Solving a level unlocks the next, and your
 best attempt is kept — a sloppy replay never costs you stars.
 
-> The par is currently derived from the number of misplaced blocks, which is a
-> true lower bound but only an estimate of the real optimum. It will be replaced
-> with an exact figure once the solver lands.
+Par is derived from an actual solution: the solver searches the level's seeded
+board and par is set 25% above the length it finds. Because every level is
+seeded, that figure is identical for every player.
+
+## Hints
+
+Stuck? **Hint** runs the solver from the position you are actually in and rings
+the one block you should move next. You get **three per puzzle**, and the counter
+on the button shows what is left. Restarting or dealing a new board resets them.
+
+The solver is a beam search over legal slides, guided by the total column
+distance of every block from its target column. It typically answers in well
+under a tenth of a second.
 
 ## Controls
+
+Four buttons sit under the board — **Undo**, **Hint**, **Restart**, **New** —
+plus a **⚙** button that opens a settings sheet holding mode, difficulty and the
+four toggles. Those are set-and-forget, so they stay out of the way.
 
 | Action | How |
 | --- | --- |
@@ -68,14 +82,15 @@ best attempt is kept — a sloppy replay never costs you stars.
 | Swipe | Drag on the board — a swipe toward the empty slot slides the whole run at once |
 | Slide with keyboard | Arrow keys push a block into the empty slot |
 | Undo | **Undo** button — steps back one tap |
+| Ask for a nudge | **Hint** — rings the next block to move, three per puzzle |
 | Reshuffle the same layout | **Restart** — replays the identical starting board |
 | Fresh puzzle | **New** |
-| Mode | Free play (endless random boards), Daily (one shared puzzle a day), or Levels (24-puzzle campaign) |
-| Difficulty | Easy (4 rows) / Normal (5) / Hard (6) — free play only |
-| Colour hints | Toggle — dims every block that is in the wrong column |
-| Symbols | Toggle — adds a shape to each colour for colourblind play |
-| Sound | Toggle — synthesised slide/bump/win tones, no audio files |
-| Vibrate | Toggle — haptic taps on mobile (hidden where unsupported) |
+| Mode | ⚙ — Free play (endless random boards), Daily (one shared puzzle a day), or Levels (24-puzzle campaign) |
+| Difficulty | ⚙ — Easy (4 rows) / Normal (5) / Hard (6) — free play only |
+| Colour hints | ⚙ toggle — dims every block that is in the wrong column |
+| Symbols | ⚙ toggle — adds a shape to each colour for colourblind play |
+| Sound | ⚙ toggle — synthesised slide/bump/win tones, no audio files |
+| Vibrate | ⚙ toggle — haptic taps on mobile (hidden where unsupported) |
 
 Solving the board fires a confetti burst. Everything respects
 `prefers-reduced-motion`, which skips the confetti entirely.
@@ -115,6 +130,7 @@ To install from your own copy, serve the folder over HTTPS (or a tunnel) and do 
 | `index.html` | Markup and app shell |
 | `styles.css` | Theme, board frame, tile animation |
 | `game.js` | Board model, sliding, swipes, win detection, timer, persistence |
+| `solver.js` | Beam-search solver behind hints and level par |
 | `fx.js` | Sound, haptics and confetti — self-contained, zero assets |
 | `manifest.webmanifest` | PWA metadata |
 | `sw.js` | Offline cache (stale-while-revalidate) |
@@ -145,5 +161,15 @@ position restores the whole run. History therefore stores only the previous gap 
 
 **Moves count blocks, not taps** — sliding a run of three counts as three, matching how the
 physical race is scored.
+
+**Blocks of the same colour are interchangeable**, and the guide is a permutation of the five
+colours, so each colour has exactly one target column and a block's row never matters. That gives
+the solver an admissible heuristic — the total column distance of every block from its target —
+since one slide closes at most one unit of it.
+
+**The board scales to the viewport height, not just its width.** A short, wide window — a tablet
+or phone in landscape, or a small desktop window — would otherwise push the buttons below the
+fold. Vertical room is measured from where the board starts and what sits below it, never from the
+board's own height, which would be circular.
 
 Bumping `CACHE` in `sw.js` forces clients onto a new build.

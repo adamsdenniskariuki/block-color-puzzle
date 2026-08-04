@@ -1,4 +1,4 @@
-const CACHE = 'bcp-v7';
+const CACHE = 'bcp-v8';
 
 const ASSETS = [
   './',
@@ -6,6 +6,7 @@ const ASSETS = [
   './styles.css',
   './game.js',
   './fx.js',
+  './solver.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',

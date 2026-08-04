@@ -25,6 +25,9 @@
   const SCRAMBLE_PER_CELL = 24;     // scramble slides, scaled by board size
   const DAILY_ROWS = 5;             // the daily puzzle is always Normal
   const LEVEL_COUNT = 24;           // campaign length
+  const HINTS_PER_GAME = 3;         // solver nudges allowed per puzzle
+  const GUIDE_RATIO = 0.42;         // guide row height as a fraction of a cell,
+                                    // mirrors .guide-cell height in styles.css
   const SITE_URL = 'https://adamsdenniskariuki.github.io/block-color-puzzle/';
 
   // A level is defined by its board size and how far it is scrambled.
@@ -59,7 +62,10 @@
     levelsGrid: document.getElementById('levels-grid'),
     levelsSummary: document.getElementById('levels-summary'),
     help:     document.getElementById('help'),
+    settings: document.getElementById('settings'),
+    diffNote: document.getElementById('diff-note'),
     undo:     document.getElementById('btn-undo'),
+    hint:     document.getElementById('btn-hint'),
     hints:    document.getElementById('opt-hints'),
     symbols:  document.getElementById('opt-symbols'),
     sound:    document.getElementById('opt-sound'),
@@ -83,9 +89,13 @@
     moves: 0,
     history: [],      // gap positions, newest last
     tiles: [],        // cell index -> tile element (or null)
+    cell: 56,         // px, recomputed by metrics() on layout and resize
+    gutter: 6,
     startedAt: 0,
     elapsed: 0,
     timerId: null,
+    hintsLeft: HINTS_PER_GAME,
+    hintCell: -1,     // cell the current hint points at, -1 when none
     solved: false
   };
 
@@ -335,12 +345,63 @@
     return n;
   }
 
-  // Every misplaced block has to move at least once, so the count is a genuine
-  // lower bound. The multiplier covers the slides spent shuffling blocks out of
-  // the way; it is a heuristic and will be replaced with a real optimal count
-  // once the solver lands.
+  // The solver returns a good (not provably shortest) solution, so par is that
+  // length plus a margin. If the solver is unavailable or gives up, fall back to
+  // the old estimate: every misplaced block must move at least once.
   function parFor() {
+    const path = solveFromHere();
+    if (path) return Math.max(10, Math.round(path.length * 1.25));
     return Math.max(10, Math.round(misplaced() * 2.4));
+  }
+
+  /* ---------------- solver bridge ---------------- */
+
+  // The board stores the gap as null; the solver wants -1.
+  function solverBoard() {
+    return state.board.map(v => (v === null ? -1 : v));
+  }
+
+  function solveFromHere() {
+    const solver = window.BCPSolver;
+    if (!solver) return null;
+    try { return solver.solveHard(solverBoard(), state.guide, COLS); }
+    catch { return null; }
+  }
+
+  function clearHint() {
+    if (state.hintCell < 0) return;
+    const tile = state.tiles[state.hintCell];
+    if (tile) tile.classList.remove('is-hint');
+    state.hintCell = -1;
+  }
+
+  function syncHintButton() {
+    el.hint.textContent = state.hintsLeft > 0 ? 'Hint ' + state.hintsLeft : 'Hint';
+    el.hint.disabled = state.solved || state.hintsLeft <= 0;
+  }
+
+  function showHint() {
+    if (state.solved || state.hintsLeft <= 0) return;
+    clearHint();
+
+    el.hint.disabled = true;
+    // Yield a frame so the button repaints before the search blocks the thread.
+    requestAnimationFrame(() => {
+      const path = solveFromHere();
+      const cell = path && path.length ? path[0] : -1;
+      const tile = cell >= 0 ? state.tiles[cell] : null;
+
+      if (tile) {
+        state.hintCell = cell;
+        tile.classList.add('is-hint');
+        state.hintsLeft--;
+        FX.sound.click();
+        FX.haptics.slide(1);
+      } else {
+        nudge(state.gap);
+      }
+      syncHintButton();
+    });
   }
 
   /* ---------------- rendering ---------------- */
@@ -395,18 +456,63 @@
     refreshTileState();
   }
 
+  // Cell size comes from the frame width, then gets clamped again so the whole
+  // board still fits the viewport height. Without that second clamp a short,
+  // wide window - a tablet in landscape, or a small desktop window - pushes the
+  // buttons below the fold.
+  //
+  // The vertical budget is measured from things that do not depend on the cell
+  // size: where the stage starts, and what sits below it. Deriving it by
+  // subtracting the board's own height would be circular, and would collapse to
+  // the minimum on first paint when the board has no height yet.
   function metrics() {
     const wrap = el.board.parentElement;
     const cs = getComputedStyle(wrap);
     const inset = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
     const wrapWidth = wrap.clientWidth - inset;
     const gutter = state.rows >= 6 ? 5 : 6;
-    const cell = Math.floor((wrapWidth - gutter * (COLS - 1)) / COLS);
-    return { cell: Math.max(34, Math.min(cell, 78)), gutter };
+
+    const byWidth = Math.floor((wrapWidth - gutter * (COLS - 1)) / COLS);
+    const byHeight = Math.floor(
+      (verticalBudget() - gutter * (state.rows - 1)) / (state.rows + GUIDE_RATIO)
+    );
+
+    const cell = Math.max(34, Math.min(byWidth, byHeight > 0 ? byHeight : byWidth, 78));
+    state.cell = cell;
+    state.gutter = gutter;
+    return { cell, gutter };
+  }
+
+  // Height available to the guide row plus the board, in px.
+  function verticalBudget() {
+    const app = document.querySelector('.app');
+    const stage = el.board.closest('.stage');
+    const controls = document.querySelector('.controls');
+    if (!app || !stage || !controls) return Infinity;
+
+    const appCs = getComputedStyle(app);
+    const appGap = parseFloat(appCs.rowGap) || 0;
+
+    const frame = el.board.parentElement;
+    const frameCs = getComputedStyle(frame);
+    const framePad = parseFloat(frameCs.paddingTop) + parseFloat(frameCs.paddingBottom);
+    const frameGap = parseFloat(frameCs.rowGap) || 0;
+
+    const divider = frame.querySelector('.divider');
+    const dividerH = divider ? divider.getBoundingClientRect().height : 0;
+
+    // Where the stage begins is fixed by the header, HUD and note above it.
+    const stageTop = stage.getBoundingClientRect().top + window.scrollY;
+    const below = controls.getBoundingClientRect().height
+      + parseFloat(appCs.paddingBottom)
+      + appGap;
+
+    return window.innerHeight - stageTop - below - framePad - dividerH - frameGap * 2 - 10;
   }
 
   function translateFor(index) {
-    const { cell, gutter } = metrics();
+    const cell = state.cell;
+    const gutter = state.gutter;
     const x = colOf(index) * (cell + gutter);
     const y = rowOf(index) * (cell + gutter);
     return `translate(${x}px, ${y}px)`;
@@ -443,6 +549,7 @@
 
     el.board.classList.toggle('is-solved', state.solved);
     el.undo.disabled = state.history.length === 0 || state.solved;
+    syncHintButton();
   }
 
   /* ---------------- moves ---------------- */
@@ -473,6 +580,8 @@
     const gapBefore = state.gap;
     const stride = sameRow ? 1 : COLS;
     const step = target < state.gap ? -stride : stride;
+
+    clearHint();
 
     let cursor = state.gap;
     let moved = 0;
@@ -680,6 +789,8 @@
     state.moves = 0;
     state.history = [];
     state.solved = false;
+    state.hintsLeft = HINTS_PER_GAME;
+    state.hintCell = -1;
     el.win.hidden = true;
     FX.confetti.clear();
 
@@ -708,10 +819,12 @@
     state.par = levels ? parFor() : 0;
     state.initial = { board: state.board.slice(), gap: state.gap, guide: state.guide.slice() };
 
+    // The note sits above the board, so it has to settle before layout measures
+    // how much vertical room the board actually has.
+    updateModeNote();
     renderGuide();
     renderBoard();
     updateHud();
-    updateModeNote();
   }
 
   function restart() {
@@ -721,6 +834,8 @@
     state.moves = 0;
     state.history = [];
     state.solved = false;
+    state.hintsLeft = HINTS_PER_GAME;
+    state.hintCell = -1;
     el.win.hidden = true;
     FX.confetti.clear();
 
@@ -769,6 +884,7 @@
     el.newBtn.textContent = levels ? 'Levels' : 'New';
     el.newBtn.title = state.mode === 'daily' ? 'The daily puzzle is the same for everyone' : '';
     el.winNew.textContent = levels ? 'Next level' : 'New puzzle';
+    el.diffNote.hidden = free;
   }
 
   function playLevel(n) {
@@ -813,7 +929,11 @@
   }
 
   document.querySelectorAll('.seg-mode .seg-btn').forEach(btn => {
-    btn.addEventListener('click', () => setMode(btn.dataset.mode));
+    btn.addEventListener('click', () => {
+      // Changing mode deals a new board, so get the sheet out of the way.
+      el.settings.hidden = true;
+      setMode(btn.dataset.mode);
+    });
   });
 
   document.getElementById('btn-new').addEventListener('click', () => {
@@ -844,6 +964,7 @@
       btn.classList.add('is-active');
       state.rows = Number(btn.dataset.rows);
       savePrefs();
+      el.settings.hidden = true;
       newGame();
     });
   });
@@ -871,9 +992,20 @@
   document.getElementById('btn-help-close').addEventListener('click', () => { el.help.hidden = true; });
   el.help.addEventListener('click', e => { if (e.target === el.help) el.help.hidden = true; });
 
+  el.hint.addEventListener('click', showHint);
+
+  document.getElementById('btn-settings').addEventListener('click', () => {
+    syncModeUi();
+    el.settings.hidden = false;
+  });
+  document.getElementById('btn-settings-close').addEventListener('click', () => { el.settings.hidden = true; });
+  el.settings.addEventListener('click', e => { if (e.target === el.settings) el.settings.hidden = true; });
+
   // Arrow keys push a block in the pressed direction, into the gap.
   document.addEventListener('keydown', e => {
-    const openModal = !el.levels.hidden ? el.levels : !el.help.hidden ? el.help : null;
+    const openModal = !el.levels.hidden ? el.levels
+      : !el.settings.hidden ? el.settings
+      : !el.help.hidden ? el.help : null;
     if (openModal) {
       // A modal owns the keyboard while it is up, so the board must not move.
       if (e.key === 'Escape') { openModal.hidden = true; e.preventDefault(); }
@@ -996,7 +1128,8 @@
       state, finish, isSolved, todayKey,
       loadDaily, recordDaily, shareText,
       loadLevels, saveLevels, recordLevel, starsFor, levelSpec, playLevel,
-      openLevelPicker, parFor, misplaced, setMode, newGame, LEVEL_COUNT
+      openLevelPicker, parFor, misplaced, setMode, newGame, LEVEL_COUNT,
+      showHint, solveFromHere, solverBoard, clearHint, slideTo, HINTS_PER_GAME
     };
   }
 })();

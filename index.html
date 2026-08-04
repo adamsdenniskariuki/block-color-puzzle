@@ -54,24 +54,38 @@
   </main>
 
   <section class="controls">
-    <div class="seg seg-mode" role="group" aria-label="Mode">
+    <div class="action-row">
+      <button id="btn-undo" class="btn" type="button">Undo</button>
+      <button id="btn-hint" class="btn" type="button">Hint</button>
+      <button id="btn-restart" class="btn" type="button">Restart</button>
+      <button id="btn-new" class="btn" type="button">New</button>
+      <button id="btn-settings" class="btn btn-gear" type="button"
+              aria-label="Settings" aria-haspopup="dialog">&#9881;</button>
+    </div>
+  </section>
+
+</div>
+
+<div id="settings" class="modal" hidden>
+  <div class="modal-card">
+    <h2>Settings</h2>
+
+    <p class="field-label" id="lbl-mode">Mode</p>
+    <div class="seg seg-mode" role="group" aria-labelledby="lbl-mode">
       <button class="seg-btn is-active" type="button" data-mode="free">Free play</button>
       <button class="seg-btn" type="button" data-mode="daily">Daily</button>
       <button class="seg-btn" type="button" data-mode="levels">Levels</button>
     </div>
 
-    <div class="seg seg-diff" role="group" aria-label="Difficulty">
+    <p class="field-label" id="lbl-diff">Difficulty</p>
+    <div class="seg seg-diff" role="group" aria-labelledby="lbl-diff">
       <button class="seg-btn" type="button" data-rows="4">Easy</button>
       <button class="seg-btn is-active" type="button" data-rows="5">Normal</button>
       <button class="seg-btn" type="button" data-rows="6">Hard</button>
     </div>
+    <p id="diff-note" class="field-note" hidden>The daily and levels have a fixed board size.</p>
 
-    <div class="btn-row">
-      <button id="btn-new" class="btn" type="button">New</button>
-      <button id="btn-restart" class="btn" type="button">Restart</button>
-      <button id="btn-undo" class="btn" type="button">Undo</button>
-    </div>
-
+    <p class="field-label">Options</p>
     <div class="toggles">
       <label class="toggle">
         <input type="checkbox" id="opt-hints">
@@ -94,8 +108,9 @@
         <span class="toggle-text">Vibrate</span>
       </label>
     </div>
-  </section>
 
+    <button id="btn-settings-close" class="btn primary" type="button">Done</button>
+  </div>
 </div>
 
 <div id="help" class="modal" hidden>
@@ -111,6 +126,8 @@
       <li>Arrow keys work too: they push blocks in that direction.</li>
       <li><strong>Daily</strong> gives everyone the same puzzle each day — solve it to build a streak.</li>
       <li><strong>Levels</strong> is a campaign of 24 puzzles that grow from a nudge to a full scramble. Beat the move par for three stars.</li>
+      <li><strong>Hint</strong> shows you one good next move. You get three per puzzle.</li>
+      <li>Mode, difficulty and options live behind the <strong>&#9881;</strong> button.</li>
     </ul>
     <button id="btn-help-close" class="btn primary" type="button">Got it</button>
   </div>
@@ -126,6 +143,7 @@
 </div>
 
 <script src="fx.js"></script>
+<script src="solver.js"></script>
 <script src="game.js"></script>
 </body>
 </html>
