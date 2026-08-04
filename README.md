@@ -159,7 +159,7 @@ npm test
 
 | Command | What it runs |
 | --- | --- |
-| `npm test` | Everything — 50 tests |
+| `npm test` | Everything — 51 tests |
 | `npm run test:unit` | Pure logic: RNG, formatting, level curve, geometry, solvability |
 | `npm run test:integration` | Real DOM: tapping, keys, undo, hints, modals, modes, persistence |
 
@@ -173,6 +173,11 @@ rather than taps, undo it in one step, spend all three hints, open each modal an
 with Escape, switch palette and confirm the board is repainted in place rather than reshuffled,
 play the daily and a level through to a win, and reboot from saved storage to prove
 preferences, stats and progress survive.
+
+Anything the game defers into `requestAnimationFrame` — the hint search, which yields a frame
+so the button can repaint before the solver blocks the thread — is awaited with a predicate
+rather than a fixed delay. jsdom fires animation frames on a ~16ms timer, not the microtask
+queue, so counting ticks makes a test flaky roughly one run in six.
 
 Two things are deliberately not tested here. jsdom has no layout engine, so anything measured
 with `getBoundingClientRect` — the height-aware tile sizing — stays verified in a real browser.

@@ -214,9 +214,9 @@ test('a hint costs one of three and disables the button at zero', async () => {
 
   for (let left = h.bcp.HINTS_PER_GAME - 1; left >= 0; left--) {
     h.click('#btn-hint');
-    await h.tick(3);
+    // showHint defers the search into a frame, so wait for the outcome.
+    await h.waitFor(() => h.bcp.state.hintsLeft === left, { label: `${left} hints left` });
 
-    assert.equal(h.bcp.state.hintsLeft, left);
     if (left > 0) {
       assert.equal(badge.textContent, String(left), 'the badge tracks what is left');
       assert.equal(button.disabled, false);
@@ -233,9 +233,24 @@ test('the hint label names the remaining count for screen readers', async () => 
   const h = await fresh();
 
   h.click('#btn-hint');
-  await h.tick(3);
+  await h.waitFor(() => h.bcp.state.hintsLeft === h.bcp.HINTS_PER_GAME - 1,
+    { label: 'a hint to be spent' });
 
   assert.match(h.$('#btn-hint').getAttribute('aria-label'), /2 remaining/);
+
+  h.close();
+});
+
+test('a hint rings exactly one tile, and it is the solver move', async () => {
+  const h = await fresh();
+
+  h.click('#btn-hint');
+  await h.waitFor(() => h.bcp.state.hintCell >= 0, { label: 'a tile to be ringed' });
+
+  const ringed = h.$$('#board .tile.is-hint');
+  assert.equal(ringed.length, 1, 'only one tile should be highlighted');
+  assert.ok([...h.bcp.neighbours(h.bcp.state.gap)].includes(h.bcp.state.hintCell),
+    'the hinted tile must be slideable right now');
 
   h.close();
 });
@@ -244,8 +259,8 @@ test('a new puzzle refills the hints', async () => {
   const h = await fresh();
 
   h.click('#btn-hint');
-  await h.tick(3);
-  assert.equal(h.bcp.state.hintsLeft, h.bcp.HINTS_PER_GAME - 1);
+  await h.waitFor(() => h.bcp.state.hintsLeft === h.bcp.HINTS_PER_GAME - 1,
+    { label: 'a hint to be spent' });
 
   h.click('#btn-new');
   await h.tick(2);

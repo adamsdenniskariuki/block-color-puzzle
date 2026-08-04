@@ -41,6 +41,22 @@ export const plain = v => (Array.isArray(v) ? [...v] : v);
 export const nums = v => [...v].sort((a, b) => a - b);
 
 /**
+ * Wait until `predicate` holds.
+ *
+ * Some of the game defers work into requestAnimationFrame, which jsdom fires
+ * on a ~16ms frame timer rather than the microtask queue, so counting ticks is
+ * a race. Poll the outcome instead.
+ */
+export async function waitFor(w, predicate, { timeout = 2000, label = 'condition' } = {}) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise(r => w.setTimeout(r, 5));
+  }
+  throw new Error(`timed out after ${timeout}ms waiting for ${label}`);
+}
+
+/**
  * @param {object} [opts]
  * @param {object} [opts.storage] Object preloaded into localStorage as bcp.v1.
  * @param {boolean} [opts.reducedMotion] Report prefers-reduced-motion as on.
@@ -101,6 +117,7 @@ export async function boot(opts = {}) {
     bcp: w.__bcp,
     solver: w.BCPSolver,
     tick: (n = 1) => tick(w, n),
+    waitFor: (predicate, opts) => waitFor(w, predicate, opts),
     storage: () => JSON.parse(w.localStorage.getItem('bcp.v1') || '{}'),
     $: sel => w.document.querySelector(sel),
     $$: sel => [...w.document.querySelectorAll(sel)],
