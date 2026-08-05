@@ -124,6 +124,11 @@ The symptom was visual, so the assertion had to be visual: screenshot the footer
 three scroll positions and require the PNG buffers to be byte-identical. No image
 decoding, no extra dependency. Reintroducing the bug turns it red.
 
+Because it compares raw pixels, this is the one test sensitive to machine load — it has
+gone red once under a concurrent `npx` call and once during a full parallel run, then
+passed on every isolated re-run. If it fails alone, believe it. If it fails only inside
+`test:all`, re-run `npm run test:layout` before touching any CSS.
+
 ## CSS traps
 
 - **`prefers-reduced-motion` blocks are opt-in lists, not blanket rules.** There are two

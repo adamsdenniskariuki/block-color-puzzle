@@ -1,6 +1,6 @@
 /*
- * Block Color Puzzle
- * ------------------
+ * Sortile
+ * -------
  * Board: COLS columns x ROWS playable rows, plus a locked guide row on top.
  * The guide row shows the target colour for each column.
  * One cell is empty. Tap a block sharing a row/column with the gap to slide it in.
@@ -980,7 +980,7 @@
     // The guide order is the day's fingerprint, so the strip differs daily.
     const strip = state.guide.map(i => SHARE_EMOJI[i]).join('');
     return [
-      'Block Color Puzzle \u2014 ' + state.dailyKey,
+      'Sortile \u2014 ' + state.dailyKey,
       strip,
       formatTime(result.ms) + ' \u00b7 ' + result.moves + ' moves \u00b7 streak ' + streak,
       SITE_URL

@@ -1,5 +1,5 @@
 /*
- * Block Color Puzzle - feel layer
+ * Sortile - feel layer
  * -------------------------------
  * Sound, haptics and confetti. No audio or image assets: every sound is
  * synthesised with WebAudio and the confetti is drawn on a canvas.

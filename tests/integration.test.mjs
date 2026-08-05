@@ -520,7 +520,16 @@ test('the daily is the same board all day and is shareable', async () => {
   assert.deepEqual([...h.bcp.state.board], board, 'the daily must not reroll');
 
   assert.match(h.bcp.todayKey(), /^\d{4}-\d{2}-\d{2}$/);
-  assert.ok(h.bcp.shareText().length > 0);
+
+  // The share text is the app's public face - it gets pasted into chats. A
+  // length check would pass on a stale or blank name, so pin the real shape:
+  // title, then the emoji fingerprint, then the stats, then the URL.
+  const share = h.bcp.shareText().split('\n');
+  assert.equal(share[0], 'Sortile \u2014 ' + h.bcp.todayKey(),
+    'the share heading must carry the shipped app name and the day');
+  assert.equal(share[1].length > 0, true, 'the emoji strip must be present');
+  assert.match(share[2], /moves/);
+  assert.match(share[3], /^https?:\/\//, 'the last line must be the site URL');
 
   h.close();
 });

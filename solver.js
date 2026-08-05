@@ -1,5 +1,5 @@
 /*
- * Block Color Puzzle - solver
+ * Sortile - solver
  * ---------------------------
  * The board only cares about colour, not identity: a column is correct when
  * every block in it matches the guide colour above it. Because the guide is a

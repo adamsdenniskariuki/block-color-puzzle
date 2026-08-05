@@ -1,6 +1,8 @@
-# Block Color Puzzle
+# Sortile
 
-A sliding block puzzle inspired by the homemade board game in `../board-game-image.jpg`.
+Colour block puzzle — a sliding block game inspired by the homemade board in
+`../board-game-image.jpg`. Published to the Microsoft Store as
+*Sortile — Colour Block Puzzle*.
 
 Zero dependencies — plain HTML, CSS and JavaScript. Runs offline and installs to a phone
 home screen as a PWA.
@@ -36,7 +38,7 @@ Solving it banks a result and extends your streak. Miss a day and the streak
 resets, but your best streak is kept. **Share** copies a spoiler-free summary:
 
 ```
-Block Color Puzzle — 2026-08-04
+Sortile — 2026-08-04
 🟩🟥🟦🟪🟨
 1:24 · 37 moves · streak 5
 ```
