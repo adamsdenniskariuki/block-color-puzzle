@@ -73,6 +73,11 @@
     paper:    'Paper'
   };
 
+  // Themes renamed after release. A saved id that no longer exists fails the
+  // lookup in loadPrefs and silently drops the user back to dark, so anything
+  // renamed has to keep a forwarding entry here.
+  const APPEARANCE_ALIASES = { sand: 'amber' };
+
   const COLS = 5;                   // one column per colour
   const STORAGE_KEY = 'bcp.v1';
   const SCRAMBLE_PER_CELL = 24;     // scramble slides, scaled by board size
@@ -336,7 +341,8 @@
     el.haptics.checked = store.haptics !== false;
     if (store.rows && [4, 5, 6].includes(store.rows)) state.rows = store.rows;
     if (store.palette && PALETTES[store.palette]) state.palette = store.palette;
-    if (store.appearance && APPEARANCES[store.appearance]) state.appearance = store.appearance;
+    const saved = APPEARANCE_ALIASES[store.appearance] || store.appearance;
+    if (saved && APPEARANCES[saved]) state.appearance = saved;
     applyTheme();
     applyFxPrefs();
   }
@@ -1143,25 +1149,19 @@
     for (const [id, name] of Object.entries(APPEARANCES)) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'swatch' + (id === state.appearance ? ' is-active' : '');
+      btn.className = 'swatch swatch-theme' + (id === state.appearance ? ' is-active' : '');
       btn.dataset.appearance = id;
       btn.setAttribute('aria-pressed', String(id === state.appearance));
       btn.title = name;
 
-      const preview = document.createElement('span');
-      preview.className = 'theme-preview';
-      preview.dataset.appearance = id;
-      const surface = document.createElement('span');
-      surface.className = 'theme-surface';
       const dot = document.createElement('span');
       dot.className = 'theme-dot';
-      preview.append(surface, dot);
 
       const label = document.createElement('span');
       label.className = 'swatch-name';
       label.textContent = name;
 
-      btn.append(preview, label);
+      btn.append(dot, label);
       btn.addEventListener('click', () => setAppearance(id));
       el.appearance.appendChild(btn);
     }

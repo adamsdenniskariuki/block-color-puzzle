@@ -601,3 +601,76 @@ test('every theme is readable and none is a duplicate', async (t) => {
 
   await context.close();
 });
+
+// Each swatch in the picker carries data-appearance and paints itself in the
+// theme it offers, so a theme is rendered *inside* whichever theme is currently
+// active. Any token a theme block leaves undefined therefore leaks in from the
+// surrounding theme instead of falling back to :root - the swatch shows a
+// colour belonging to a different theme. That is how Slate shipped with no
+// --accent of its own: at root it inherited the right value from :root and
+// looked correct, so only the nested preview was wrong.
+test('a theme previewed inside another theme still looks like itself', async (t) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  await page.goto(`${server.url}/index.html`);
+  await page.waitForFunction(() => Boolean(window.__bcp));
+
+  const result = await page.evaluate(() => {
+    // The tokens a swatch actually paints with.
+    const TOKENS = ['--bg', '--text', '--accent', '--wash'];
+    const read = (el) => {
+      const cs = getComputedStyle(el);
+      return TOKENS.map((t) => cs.getPropertyValue(t).trim());
+    };
+
+    const ids = Object.keys(window.__bcp.APPEARANCES);
+
+    // What each theme looks like when it owns the whole document.
+    const atRoot = {};
+    for (const id of ids) {
+      window.__bcp.setAppearance(id);
+      atRoot[id] = read(document.documentElement);
+    }
+
+    // The same theme, nested inside a different one.
+    const host = document.createElement('div');
+    host.style.cssText = 'position:absolute;left:-999px';
+    document.body.appendChild(host);
+
+    const nested = {};
+    ids.forEach((id, i) => {
+      const under = ids[(i + 1) % ids.length];
+      host.dataset.appearance = under;
+      const inner = document.createElement('div');
+      inner.dataset.appearance = id;
+      host.appendChild(inner);
+      nested[id] = { under, tokens: read(inner) };
+      inner.remove();
+    });
+
+    host.remove();
+    return { ids, atRoot, nested, TOKENS };
+  });
+
+  for (const id of result.ids) {
+    await t.test(id, () => {
+      const want = result.atRoot[id];
+      const got = result.nested[id].tokens;
+
+      // Guard against the probe reading empty strings, which would make every
+      // comparison below trivially true.
+      assert.ok(want.every((v) => v.length > 0),
+        `${id} resolved no values at root - the probe is not measuring anything`);
+
+      result.TOKENS.forEach((token, i) => {
+        assert.equal(got[i], want[i],
+          `${token} is "${got[i]}" when ${id} is previewed inside ${result.nested[id].under}, ` +
+          `but "${want[i]}" when ${id} is the active theme - ${id} does not define ${token}`);
+      });
+    });
+  }
+
+  await context.close();
+});

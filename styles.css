@@ -69,6 +69,7 @@
   --line-strong: #2a2a31;
   --line-bright: #3d3d46;
   --board-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  --wash: rgba(255, 255, 255, 0.06);
 }
 
 [data-appearance="slate"] {
@@ -78,10 +79,13 @@
   --text: #f4f7fa;
   --text-body: #cdd7e1;
   --text-dim: #a8b6c4;
-  --accent-soft: #2c4257;
+  --accent: #5cc9d6;
+  --accent-soft: #1d4650;
+  --on-accent: #04171b;
   --line: #3a4552;
   --line-strong: #4a5665;
   --line-bright: #5e6b7b;
+  --wash: rgba(255, 255, 255, 0.06);
 }
 
 [data-appearance="forest"] {
@@ -97,6 +101,7 @@
   --line: #1d3325;
   --line-strong: #2a4633;
   --line-bright: #3a5c44;
+  --wash: rgba(255, 255, 255, 0.06);
 }
 
 [data-appearance="plum"] {
@@ -112,6 +117,7 @@
   --line: #2b1e3a;
   --line-strong: #3b2a4f;
   --line-bright: #4e3a66;
+  --wash: rgba(255, 255, 255, 0.06);
 }
 
 [data-appearance="amber"] {
@@ -127,6 +133,7 @@
   --line: #33291f;
   --line-strong: #45382a;
   --line-bright: #5c4b38;
+  --wash: rgba(255, 255, 255, 0.06);
 }
 
 [data-appearance="light"] {
@@ -618,7 +625,7 @@ body {
 .toggle-text { line-height: 1.2; }
 
 .toggle input:checked + .switch { background: var(--accent); }
-.toggle input:checked + .switch::after { transform: translateX(14px); background: var(--text); }
+.toggle input:checked + .switch::after { transform: translateX(14px); background: var(--frame); }
 
 .toggle:has(input:checked) { border-color: rgba(77, 163, 255, 0.5); color: var(--text); }
 
@@ -852,37 +859,30 @@ body {
   font-weight: 600;
 }
 
-/* Each preview re-scopes the theme variables onto itself, so it paints in the
-   theme it is offering while the card around it stays in the current one. */
-.theme-preview {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 32px;
-  border-radius: 7px;
+/* Each theme swatch re-scopes the theme variables onto itself, so the row is
+   its own preview - background, text and accent all come from the theme it is
+   offering while the modal around it stays in the current one. */
+.swatch-theme {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
   background: var(--bg);
-  border: 1px solid var(--line-strong);
-  overflow: hidden;
+  border-color: var(--line-strong);
+  color: var(--text);
 }
 
-.theme-surface {
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  top: 6px;
-  height: 9px;
-  border-radius: 3px;
-  background: var(--bg-soft);
+.swatch-theme .swatch-name {
+  color: var(--text);
 }
 
 .theme-dot {
-  position: absolute;
-  left: 6px;
-  bottom: 6px;
+  flex: none;
   width: 14px;
-  height: 7px;
-  border-radius: 4px;
+  height: 14px;
+  border-radius: 50%;
   background: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--wash);
 }
 
 /* ---------- stats ---------- */

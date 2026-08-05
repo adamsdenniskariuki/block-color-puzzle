@@ -169,6 +169,23 @@ passed on every isolated re-run. If it fails alone, believe it. If it fails only
   dark preview would inherit the *current* theme and preview the wrong thing. `:root`
   keeps the palette so the first paint is right before JS runs; the duplicate block makes
   the preview right. Both are load-bearing.
+- **A theme block must define every colour token it wants, even ones `:root` already
+  has.** Because previews are nested, an undefined token does *not* fall back to `:root` —
+  it inherits from the surrounding theme, so the swatch shows a colour belonging to a
+  different theme. Slate shipped with no `--accent`: correct at root, wrong in every
+  preview. `a theme previewed inside another theme still looks like itself` in
+  `tests/layout.test.mjs` compares each theme nested vs. at root and names the missing
+  token. Geometry tokens (`--radius`, `--gutter`, `--cell`, `--slot`) and the deliberately
+  theme-independent ones (`--gold`, `--danger`) are correctly left undefined.
+- **Never rename a theme id that has shipped.** `loadPrefs` validates the saved id against
+  `APPEARANCES` and silently falls back to dark, so everyone using that theme loses it on
+  their next refresh with no clue why. Renaming `sand` → `amber` did exactly this. Add a
+  forwarding entry to `APPEARANCE_ALIASES` in `game.js` instead; there are tests covering
+  both the alias and the genuinely-unknown case.
+- **Anything drawn *on* the accent must not use `--text`.** `--text` inverts with the
+  theme, so a switch knob that is white on dark themes turns near-black on light ones
+  while its track stays coloured. Use `--frame` (near-white in every theme) or
+  `--on-accent`.
 - **Any new colour must be a token, not a literal.** Four literals are deliberate
   exceptions — the white tile outline, the tile label `rgba(255,255,255,0.92)`, the
   win-banner green and the star gold. All four sit on saturated tiles or coloured banners

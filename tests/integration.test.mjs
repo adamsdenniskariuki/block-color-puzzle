@@ -398,6 +398,34 @@ test('appearance sets the document theme and survives a reload', async () => {
   again.close();
 });
 
+// A saved theme id that no longer exists fails the lookup in loadPrefs and
+// drops the user back to dark on every refresh, with nothing to explain why.
+// This is what happened when Sand was renamed to Amber.
+test('a theme renamed after release keeps working for whoever had it', async () => {
+  const h = await fresh();
+  h.bcp.setAppearance('amber');
+  await h.tick();
+  const stored = h.storage();
+  h.close();
+
+  assert.equal(stored.appearance, 'amber', 'the theme should have been saved at all');
+
+  stored.appearance = 'sand';
+  const again = await fresh({ storage: stored });
+  assert.equal(again.doc.documentElement.dataset.appearance, 'amber',
+    'the old id should forward to the new one, not fall back to the default');
+  again.close();
+});
+
+// An id that never existed is a different case - there is nothing to forward
+// to, so falling back is right. This guards the alias table from swallowing
+// genuine rubbish.
+test('an unknown theme falls back to the default', async () => {
+  const h = await fresh({ storage: { appearance: 'chartreuse' } });
+  assert.equal(h.doc.documentElement.dataset.appearance, 'dark');
+  h.close();
+});
+
 test('every palette and appearance is offered as a control', async () => {
   const h = await fresh();
 
