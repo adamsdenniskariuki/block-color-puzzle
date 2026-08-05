@@ -64,17 +64,17 @@ Allow 30s–2min for the build.
 
 ```powershell
 npm install       # jsdom + playwright, dev-only
-npm run test:all  # 174 tests, about 15s
+npm run test:all  # 179 tests, about 15s
 ```
 
 | Command | Tests | Needs a browser |
 | --- | --- | --- |
 | `npm run test:unit` | 17 | no |
-| `npm run test:integration` | 54 | no |
+| `npm run test:integration` | 59 | no |
 | `npm run test:palette` | 4 | no |
-| `npm test` | 75 | no |
+| `npm test` | 80 | no |
 | `npm run test:layout` | 99 | yes, headless Chromium |
-| `npm run test:all` | 174 | yes |
+| `npm run test:all` | 179 | yes |
 
 `node --test` runs files in parallel but the tests *inside* a file serially. The two
 big suites each take about 13s, so `test:all` costs about what the slowest file costs.
@@ -124,6 +124,10 @@ duplicated copy of the logic to drift out of sync.
   `h.close()`, so the window's timers keep the process alive and `node --test` prints its
   summary and then sits there. Pass `--test-timeout=20000` when running a mutation, and be
   ready to `stop_powershell`.
+- **A guard that a cheaper guard already covers is untested by definition.** "A saved board
+  that does not match its own size is discarded" passed with the size check deleted, because
+  truncating the board also pushed the gap out of range and the *gap* check caught it. Feed a
+  case only the guard under test can reject — here, appending a cell rather than removing one.
 
 ### Layout tests assert invariants, never pixels
 
@@ -303,6 +307,31 @@ consecutive frames match before recording. That is safe because a real bleed is 
 - **"Started" counts on the first move, not on the deal.** Opening the app and closing it again
   used to log a started puzzle and drag the finish rate down for free. The bump lives in
   `slideTo()` behind `if (!state.counted)`.
+
+## Resume traps
+
+- **`saveInplay()` hangs off `updateHud()`.** That looks like a layering mistake and is not:
+  `updateHud` is called from exactly the five board-mutating sites (`slideTo`, `undo`, `finish`,
+  `newGame`, `restart`), so any future mutation persists for free instead of quietly failing to.
+  The timer writes `el.time.textContent` directly and never routes through `updateHud`, so this
+  is not a four-times-a-second localStorage write. `showHint` does not touch the board, so it
+  calls `saveInplay()` itself.
+- **`abandonBoard()` saves *after* it flushes.** The snapshot has to carry the banking markers
+  `flushActivity()` just moved and the `elapsed` that `stopTimer()` just recomputed. Saving first
+  writes a snapshot that will double-count on resume.
+- **The whole position is stored, not a seed.** Free play has no seed at all, and for daily and
+  levels a seed only rebuilds the *starting* board — which throws away exactly the thing worth
+  keeping. `state.initial` is stored alongside it so Restart still works after a resume.
+- **A restored board must be validated before it reaches the renderer.** `restoreInplay()` checks
+  the row count, `board.length === rows * COLS`, `guide.length === COLS`, and that `gap` is in
+  range *and* actually null. An older build's board otherwise reaches `renderBoard()` and throws
+  during boot, which bricks the app with no way for the user to clear it.
+- **A stale daily keeps the mode and drops the board.** Returning `false` from `restoreInplay()`
+  after setting `state.mode = 'daily'` lets boot deal today's puzzle in the mode the player was
+  already in. Mode is not otherwise persisted.
+- **`finish()` clears the snapshot through `saveInplay()`, not by calling `clearInplay()`.**
+  `saveInplay()` short-circuits to `clearInplay()` when `state.solved`, so the single hook on
+  `updateHud` covers both directions.
 
 ## Keyboard cursor traps
 

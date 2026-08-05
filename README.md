@@ -130,6 +130,14 @@ out of the way.
 Solving the board fires a confetti burst. Everything respects
 `prefers-reduced-motion`, which skips the confetti entirely.
 
+**You never lose a board.** Close the tab, background the app or reload, and the
+position, move count, elapsed time, undo history and remaining hints all come
+back exactly as you left them — no "continue?" prompt, you are simply back in the
+puzzle. Free play needs this most, since its boards are random and could not be
+rebuilt otherwise, but Daily and Levels get it too so you are never made to redo
+work on a puzzle you cannot reroll. A daily left over from a previous day is the
+one thing dropped: you stay in Daily and get that day's puzzle instead.
+
 The empty slot is the one piece of state you need every turn, so it is drawn as a
 recess — a dark inner top edge and rim, the inverse of the raised lip on the blocks —
 and held above 3:1 against the frame in every theme by a test that samples the

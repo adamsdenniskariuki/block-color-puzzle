@@ -1084,3 +1084,115 @@ test('a corrupt store is ignored rather than crashing the game', async () => {
 
   h.close();
 });
+
+/* ---------------- resume ---------------- */
+
+/** Play `n` moves on the current board and hand back the storage blob. */
+async function playAndLeave(h, n = 3) {
+  const { state, neighbours } = h.bcp;
+  for (let i = 0; i < n; i++) {
+    h.bcp.slideTo([...neighbours(state.gap)][0], true);
+    await h.tick();
+  }
+  h.win.dispatchEvent(new h.win.Event('pagehide'));
+  await h.tick();
+  return h.storage();
+}
+
+// Free play has no seed to rebuild from, so the position itself has to be
+// stored or the board is simply gone.
+test('a half-finished board comes back exactly as it was left', async () => {
+  const h = await fresh();
+
+  const stored = await playAndLeave(h, 3);
+  const board = [...h.bcp.state.board];
+  const gap = h.bcp.state.gap;
+  const moves = h.bcp.state.moves;
+  assert.ok(moves > 0);
+  h.close();
+
+  const again = await fresh({ storage: stored });
+  assert.deepEqual([...again.bcp.state.board], board, 'the position should be identical');
+  assert.equal(again.bcp.state.gap, gap);
+  assert.equal(again.bcp.state.moves, moves, 'the move count carries over');
+  assert.equal(again.$('#stat-moves').textContent, String(moves), 'and the HUD shows it');
+
+  again.close();
+});
+
+// Leaving banks the board's moves; resuming must not let the eventual solve
+// bank them all over again.
+test('a resumed board does not bank its moves a second time', async () => {
+  const h = await fresh();
+
+  const stored = await playAndLeave(h, 3);
+  const banked = h.bcp.loadStats().moves;
+  assert.ok(banked > 0, 'leaving should have banked the moves');
+  h.close();
+
+  const again = await fresh({ storage: stored });
+  assert.equal(again.bcp.loadStats().moves, banked, 'resuming banks nothing on its own');
+
+  await autoSolve(again, { record: true });
+  await again.tick(2);
+
+  assert.equal(again.bcp.loadStats().moves, again.bcp.state.moves,
+    'the lifetime total must equal the moves played, not the two flushes summed');
+
+  again.close();
+});
+
+// The daily is pinned to a date. Coming back tomorrow must deal tomorrow's
+// puzzle, not resurrect an abandoned one.
+test('a daily left over from another day is dropped rather than resumed', async () => {
+  const h = await fresh();
+
+  h.bcp.setMode('daily');
+  await h.tick();
+  const stored = await playAndLeave(h, 2);
+  const stale = [...h.bcp.state.board];
+  h.close();
+
+  stored.inplay.dailyKey = '2001-01-01';
+
+  const again = await fresh({ storage: stored });
+  assert.equal(again.bcp.state.mode, 'daily', 'the player stays in the mode they were in');
+  assert.equal(again.bcp.state.moves, 0, 'a stale daily must not carry its moves over');
+  assert.equal(again.storage().inplay.dailyKey, again.bcp.todayKey(),
+    'the board on screen should be today\'s');
+  assert.notDeepEqual([...again.bcp.state.board], stale);
+
+  again.close();
+});
+
+test('solving clears the saved board, so the next boot deals a fresh one', async () => {
+  const h = await fresh();
+
+  await autoSolve(h, { record: true });
+  await h.tick(2);
+  assert.equal(h.bcp.isSolved(), true);
+
+  assert.equal(h.storage().inplay, undefined, 'a solved board is not worth resuming');
+
+  h.close();
+});
+
+// A board written by an older build, or half-written by a failing quota, must
+// never reach the renderer. The extra cell is appended rather than truncated on
+// purpose: truncating moves the gap out of range, so the gap check catches it
+// and the size check is never exercised.
+test('a saved board that does not match its own size is discarded', async () => {
+  const h = await fresh();
+  const stored = await playAndLeave(h, 2);
+  h.close();
+
+  stored.inplay.board.push(0);
+  assert.equal(stored.inplay.board[stored.inplay.gap], null, 'the gap is still valid');
+
+  const again = await fresh({ storage: stored });
+  assert.equal(again.bcp.state.board.length, again.bcp.state.rows * again.bcp.COLS,
+    'a correctly sized board should have been dealt instead');
+  assert.equal(again.bcp.state.moves, 0);
+
+  again.close();
+});

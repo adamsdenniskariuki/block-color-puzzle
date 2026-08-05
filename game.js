@@ -648,6 +648,8 @@
         nudge(state.gap);
       }
       syncHintButton();
+      // Hints do not touch the board, so they never reach updateHud.
+      saveInplay();
     });
   }
 
@@ -1032,6 +1034,11 @@
       el.bestLabel.textContent = 'Best';
       el.best.textContent = best ? formatTime(best.ms) : '\u2014';
     }
+
+    // Every board mutation lands here, so this is the one hook that cannot go
+    // stale as the game grows. The timer writes el.time directly and does not
+    // come through updateHud, so this is not a once-a-tick write.
+    saveInplay();
   }
 
   function starMarkup(stars) {
@@ -1221,6 +1228,103 @@
     if (state.solved) return;
     stopTimer();
     flushActivity();
+    // After the flush, so the snapshot carries the updated banking markers and
+    // the elapsed time stopTimer just recomputed.
+    saveInplay();
+  }
+
+  /* ---------------- resume ---------------- */
+
+  // The whole position is stored, not a seed. Free play has no seed to rebuild
+  // from, and even the seeded modes would only rebuild the *starting* board,
+  // throwing away every move the player had already made - which is the entire
+  // thing worth keeping.
+  function saveInplay() {
+    if (!state.board.length) return;
+    if (state.solved) { clearInplay(); return; }
+
+    const store = loadStore();
+    store.inplay = {
+      mode: state.mode,
+      rows: state.rows,
+      level: state.level,
+      par: state.par,
+      dailyKey: state.dailyKey,
+      board: state.board.slice(),
+      guide: state.guide.slice(),
+      gap: state.gap,
+      initial: state.initial,
+      moves: state.moves,
+      elapsed: state.elapsed,
+      history: state.history.slice(),
+      hintsLeft: state.hintsLeft,
+      // Without these the resumed board would bank its moves a second time on
+      // the way out, inflating the lifetime totals on every app switch.
+      bankedMoves: state.bankedMoves,
+      bankedMs: state.bankedMs,
+      counted: state.counted
+    };
+    saveStore(store);
+  }
+
+  function clearInplay() {
+    const store = loadStore();
+    if (!store.inplay) return;
+    delete store.inplay;
+    saveStore(store);
+  }
+
+  // Returns true when a board was put back, so boot knows to skip the deal.
+  function restoreInplay() {
+    const saved = loadStore().inplay;
+    if (!saved || !Array.isArray(saved.board) || !Array.isArray(saved.guide)) return false;
+
+    // A board written by an older build, or half-written by a storage failure,
+    // must never reach the renderer.
+    const rows = Number(saved.rows);
+    if (!(rows > 0) || saved.board.length !== rows * COLS || saved.guide.length !== COLS) {
+      clearInplay();
+      return false;
+    }
+    if (saved.gap < 0 || saved.gap >= saved.board.length || saved.board[saved.gap] !== null) {
+      clearInplay();
+      return false;
+    }
+    // Yesterday's daily is a different puzzle. Keep the player in daily mode -
+    // that is where they were - but let boot deal today's board.
+    if (saved.mode === 'daily' && saved.dailyKey !== todayKey()) {
+      clearInplay();
+      state.mode = 'daily';
+      return false;
+    }
+
+    state.mode = saved.mode || 'free';
+    state.rows = rows;
+    state.level = saved.level || 1;
+    state.par = saved.par || 0;
+    state.dailyKey = saved.dailyKey || null;
+    state.board = saved.board.slice();
+    state.guide = saved.guide.slice();
+    state.gap = saved.gap;
+    state.initial = saved.initial || { board: state.board.slice(), gap: state.gap, guide: state.guide.slice() };
+    state.moves = saved.moves || 0;
+    state.elapsed = saved.elapsed || 0;
+    state.history = Array.isArray(saved.history) ? saved.history.slice() : [];
+    state.hintsLeft = Number.isFinite(saved.hintsLeft) ? saved.hintsLeft : HINTS_PER_GAME;
+    state.bankedMoves = saved.bankedMoves || 0;
+    state.bankedMs = saved.bankedMs || 0;
+    state.counted = !!saved.counted;
+    state.solved = false;
+    state.hintCell = -1;
+
+    // The clock stays stopped: it resumes on the next move, exactly as it does
+    // after the app is backgrounded mid-board.
+    updateModeNote();
+    renderGuide();
+    renderBoard();
+    updateHud();
+    syncHintButton();
+    return true;
   }
 
   function restart() {
@@ -1677,8 +1781,11 @@
   loadPrefs();
   buildPalettePicker();
   buildAppearancePicker();
+  // Put a half-finished board back before the mode UI syncs, since restoring
+  // sets the mode the UI has to reflect.
+  const resumed = restoreInplay();
   syncModeUi();
-  newGame();
+  if (!resumed) newGame();
 
   // Local-only hook so the game can be driven from a test harness.
   // Never present on the deployed site.
@@ -1692,6 +1799,7 @@
       showHint, solveFromHere, solverBoard, clearHint, slideTo, HINTS_PER_GAME,
       loadStats, saveStats, bumpStats, renderStats, statsRows, bestRows,
       abandonBoard, flushActivity,
+      saveInplay, clearInplay, restoreInplay,
       formatLong, formatTime, totalStars,
       setPalette, setAppearance, palette, colourHex, PALETTES, APPEARANCES,
       PALETTE_ALIASES, APPEARANCE_ALIASES,
