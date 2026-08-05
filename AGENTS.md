@@ -64,7 +64,7 @@ Allow 30s–2min for the build.
 
 ```powershell
 npm install       # jsdom + playwright, dev-only
-npm run test:all  # 179 tests, about 15s
+npm run test:all  # 184 tests, about 15s
 ```
 
 | Command | Tests | Needs a browser |
@@ -73,8 +73,8 @@ npm run test:all  # 179 tests, about 15s
 | `npm run test:integration` | 59 | no |
 | `npm run test:palette` | 4 | no |
 | `npm test` | 80 | no |
-| `npm run test:layout` | 99 | yes, headless Chromium |
-| `npm run test:all` | 179 | yes |
+| `npm run test:layout` | 104 | yes, headless Chromium |
+| `npm run test:all` | 184 | yes |
 
 `node --test` runs files in parallel but the tests *inside* a file serially. The two
 big suites each take about 13s, so `test:all` costs about what the slowest file costs.
@@ -332,6 +332,33 @@ consecutive frames match before recording. That is safe because a real bleed is 
 - **`finish()` clears the snapshot through `saveInplay()`, not by calling `clearInplay()`.**
   `saveInplay()` short-circuits to `clearInplay()` when `state.solved`, so the single hook on
   `updateHud` covers both directions.
+
+## Fade unsorted traps
+
+- **It is a progress display, not a hint.** Roughly three quarters of the blocks on a fresh
+  board are in the wrong column (measured: 13-22 of 24), so it can never point at the block to
+  move next. It shipped as an outline on every wrong block, which is why nobody could see it -
+  a badge on almost everything is a badge on nothing. The affordance runs the other way now:
+  `.tile.is-wrong { filter: grayscale(0.92); }` drains the wrong ones so the settled ones are
+  the only colour left. The toggle was called "Highlight misplaced" and is now "Fade unsorted",
+  because nothing gets highlighted.
+- **grayscale, not opacity.** Symbols mode paints the colourblind glyph as `tile.textContent`
+  (`game.js` ~765), and blanket opacity would fade that glyph on three quarters of the board.
+  `grayscale()` leaves white alone and holds luminance, so the block also keeps the contrast
+  against the board that every theme was tuned for.
+- **The filter must not go back on `outline`.** `.tile:focus-visible` owns the outline for the
+  keyboard cursor, so the old `outline-color` treatment was erased the moment a flagged block
+  was focused.
+- **A screenshot test has to wait for the transition.** `.tile` transitions `filter` over 130ms,
+  and two `requestAnimationFrame` waits photograph the board about a fifth of the way in - the
+  first version of the layout test measured `grayscale(0.13)` and read the pixels as barely
+  touched. Poll `getComputedStyle(tile).filter` until it stops changing before screenshotting.
+- **`getComputedStyle` cannot see this feature working.** The declared `background` never
+  changes, so only real pixels prove it. The layout test screenshots `#board`, decodes the PNG
+  through the page's own canvas, and compares chroma (`max(rgb) - min(rgb)`) between the two
+  groups - not luminance, which the filter preserves on purpose.
+- **`store.hints` and `store.stats.hints` are different things.** The first is the toggle
+  preference (boolean, top level), the second is the lifetime hint counter. They do not collide.
 
 ## Keyboard cursor traps
 

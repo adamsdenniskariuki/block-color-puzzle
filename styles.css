@@ -367,7 +367,7 @@ body {
   font-size: calc(var(--cell) * 0.3);
   line-height: 1;
   cursor: pointer;
-  transition: transform 130ms cubic-bezier(0.3, 0.9, 0.4, 1), box-shadow 130ms ease, outline-color 130ms ease;
+  transition: transform 130ms cubic-bezier(0.3, 0.9, 0.4, 1), box-shadow 130ms ease, filter 130ms ease;
   box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.24), 0 1px 2px rgba(0, 0, 0, 0.25);
   outline: 2px solid transparent;
   outline-offset: -2px;
@@ -379,12 +379,19 @@ body {
 
 .tile.is-movable:hover { box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.24), 0 0 0 2px rgba(255, 255, 255, 0.75); }
 
-.tile.is-wrong { outline-color: rgba(255, 255, 255, 0.9); }
+/* Roughly three quarters of the blocks on a fresh board are in the wrong column,
+   so marking them cannot work - a badge on almost everything is a badge on
+   nothing. Drain the colour out of the wrong ones instead and the few settled
+   columns become the only coloured things on the board. grayscale() is used
+   rather than opacity because it leaves white untouched, so the colourblind
+   symbol stays legible, and it holds luminance, so the block keeps the contrast
+   against the board that every theme was tuned for. */
+.tile.is-wrong { filter: grayscale(0.92); }
 
-/* The keyboard cursor. .tile sets a transparent outline to reserve the ring for
-   is-wrong, which also suppresses the browser default - so without this, tabbing
-   to the board lands on an invisible cell. The gap uses :focus rather than
-   :focus-visible because it is focused programmatically. */
+/* The keyboard cursor. .tile sets a transparent outline that suppresses the
+   browser default - so without this, tabbing to the board lands on an invisible
+   cell. The gap uses :focus rather than :focus-visible because it is focused
+   programmatically. */
 .tile:focus-visible,
 .slot:focus {
   outline: 3px solid var(--accent);

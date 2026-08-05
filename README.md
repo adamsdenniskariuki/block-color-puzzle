@@ -122,7 +122,7 @@ out of the way.
 | Difficulty | ⚙ — Easy (4 rows) / Normal (5) / Hard (6) — free play only |
 | Colours | ⚙ — Classic / Accessible / Candy / Jewel |
 | Appearance | ⚙ — Dark / Midnight / Slate / Forest / Plum / Amber / Light / Paper |
-| Colour hints | ⚙ toggle — dims every block that is in the wrong column |
+| Fade unsorted | ⚙ toggle — drains the colour from every block that is in the wrong column, so the ones already home are the only colour left on the board |
 | Symbols | ⚙ toggle — adds a shape to each colour for colourblind play |
 | Sound | ⚙ toggle — synthesised slide/bump/win tones, no audio files |
 | Vibrate | ⚙ toggle — haptic taps on mobile (hidden where unsupported) |

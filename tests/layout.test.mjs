@@ -685,6 +685,118 @@ test('the empty slot reads as a recess in every theme', async (t) => {
   await context.close();
 });
 
+// About three quarters of the blocks on a fresh board are in the wrong column,
+// so the old treatment - an outline on each of them - marked nearly the whole
+// board, which is the same as marking none of it. The affordance now runs the
+// other way: the misplaced blocks lose their colour, leaving the settled ones as
+// the only coloured things on the board. That is a rendered effect - a CSS
+// filter - and the declared background never changes, so neither jsdom nor
+// getComputedStyle can see it. The only honest check is to photograph the board.
+test('the colour hint drains the misplaced blocks in every palette', async (t) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  await page.goto(`${server.url}/index.html`);
+  await page.waitForFunction(() => Boolean(window.__bcp));
+
+  await page.evaluate(() => {
+    const box = document.getElementById('opt-hints');
+    if (!box.checked) {
+      box.checked = true;
+      box.dispatchEvent(new Event('change'));
+    }
+  });
+
+  const palettes = await page.evaluate(() => Object.keys(window.__bcp.PALETTES));
+
+  for (const id of palettes) {
+    await t.test(id, async () => {
+      // A board where every block is already home has nothing to compare against,
+      // so deal until both groups exist. A fresh scramble gives both almost always.
+      const probe = await page.evaluate(async (pid) => {
+        window.__bcp.setPalette(pid);
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          window.__bcp.newGame();
+          const tiles = [...document.querySelectorAll('#board .tile')];
+          const wrong = tiles.filter((tile) => tile.classList.contains('is-wrong'));
+          if (!wrong.length || wrong.length === tiles.length) continue;
+          // The drain is transitioned, so a plain rAF wait photographs the board
+          // a fifth of the way into the fade - it measured grayscale(0.13) and
+          // the pixels looked barely touched. Wait for the filter to settle.
+          const settled = async () => {
+            let last = '';
+            for (let i = 0; i < 40; i += 1) {
+              await new Promise((r) => setTimeout(r, 30));
+              const now = tiles.map((tile) => getComputedStyle(tile).filter).join('|');
+              if (now === last) return;
+              last = now;
+            }
+          };
+          await settled();
+          const board = document.getElementById('board').getBoundingClientRect();
+          return {
+            rect: { x: Math.round(board.x), y: Math.round(board.y), width: Math.round(board.width), height: Math.round(board.height) },
+            tiles: tiles.map((tile) => {
+              const r = tile.getBoundingClientRect();
+              return {
+                wrong: tile.classList.contains('is-wrong'),
+                filter: getComputedStyle(tile).filter,
+                x: Math.round(r.x + r.width / 2 - board.x),
+                y: Math.round(r.y + r.height / 2 - board.y)
+              };
+            })
+          };
+        }
+        return null;
+      }, id);
+
+      assert.ok(probe, 'could not deal a board holding both settled and misplaced blocks');
+
+      // The class carries the whole feature, so a rule that stops matching is the
+      // failure to catch first - the pixels below would then simply all agree.
+      for (const tile of probe.tiles) {
+        const expected = tile.wrong ? 'is not none' : 'is none';
+        const actual = tile.filter === 'none' ? 'is none' : 'is not none';
+        assert.equal(actual, expected, `a ${tile.wrong ? 'misplaced' : 'settled'} block's filter ${actual}, expected it ${expected}`);
+      }
+
+      const shot = await page.screenshot({ clip: probe.rect });
+      const pixels = await page.evaluate(async (b64) => {
+        const img = new Image();
+        img.src = `data:image/png;base64,${b64}`;
+        await img.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        return Array.from(ctx.getImageData(0, 0, img.width, img.height).data);
+      }, shot.toString('base64'));
+
+      // Chroma, not luminance: the filter holds brightness on purpose so the block
+      // keeps the contrast against the board that every theme was tuned for. What
+      // it takes away is the colour.
+      const chromaAt = (x, y) => {
+        const i = (y * probe.rect.width + x) * 4;
+        const rgb = [pixels[i], pixels[i + 1], pixels[i + 2]];
+        return Math.max(...rgb) - Math.min(...rgb);
+      };
+
+      const drained = probe.tiles.filter((tile) => tile.wrong).map((tile) => chromaAt(tile.x, tile.y));
+      const vivid = probe.tiles.filter((tile) => !tile.wrong).map((tile) => chromaAt(tile.x, tile.y));
+
+      assert.ok(Math.max(...drained) <= 30,
+        `a misplaced block still carries ${Math.max(...drained)} chroma, so it does not read as drained`);
+      assert.ok(Math.min(...vivid) >= 60,
+        `a settled block only carries ${Math.min(...vivid)} chroma, so it has nothing to stand out with`);
+    });
+  }
+
+  await context.close();
+});
+
+
 // Each swatch in the picker carries data-appearance and paints itself in the
 // theme it offers, so a theme is rendered *inside* whichever theme is currently
 // active. Any token a theme block leaves undefined therefore leaks in from the
