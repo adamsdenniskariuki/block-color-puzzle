@@ -98,6 +98,15 @@ duplicated copy of the logic to drift out of sync.
   the game defers into rAF — the hint search does, so the button can repaint before the
   solver blocks the thread — must be awaited with a predicate, never a fixed tick count.
   Counting ticks was flaky about one run in six.
+- **jsdom clicks buttons inside `hidden` parents.** Once a control moves into a sheet,
+  `h.click('#btn-restart')` still fires and proves nothing about whether a user could
+  reach it. Assert containment (`$('#more').contains(...)`) and the open path instead.
+- **A `disabled` button silently makes a test vacuous** for the opposite reason: the
+  click never fires, so any assertion after it passes by default. The daily-mode test
+  spent months "proving" the daily does not reroll while clicking a dead button.
+- **`state.seed` does not exist.** Free play uses `Math.random`; daily and levels build
+  an RNG from `mulberry32(seedFrom(...))` and keep no seed. Asserting on it compares
+  `undefined` to `undefined` and always passes. Compare `state.board` instead.
 
 ### Layout tests assert invariants, never pixels
 
@@ -146,6 +155,21 @@ passed on every isolated re-run. If it fails alone, believe it. If it fails only
 - **The landscape breakpoint is `min-width: 520px`, not 600px.** A 568×320 landscape
   iPhone SE sits between the two; at 600px it fell back to the stacked layout and
   overflowed the viewport by 67px at six rows.
+
+## SVG icon traps
+
+The action row and the board menu use an inline `<symbol>` sprite at the top of
+`index.html`, referenced with `<use href="#i-…">`.
+
+- **A descendant selector cannot reach into a `<use>`.** `.icon circle { fill: … }` does
+  nothing, because `<use>` clones its content into a shadow tree. Inherited properties
+  (`fill`, `stroke`) *do* pass through from the `<use>` element, and an element's own
+  presentation attribute beats an inherited value — so set per-shape fills as attributes
+  on the `<symbol>` itself.
+- **`.sprite` must not be `display: none`.** That kills `<use>` in some browsers. Hide it
+  with `position: absolute; width: 0; height: 0; overflow: hidden`.
+- **Never write `textContent` on a button that contains an icon** — it wipes the `<svg>`
+  child. Every such button has a dedicated label span (`#new-label`); write to that.
 
 ## Manifest
 

@@ -341,7 +341,7 @@ test('Escape closes an open modal', async () => {
   const h = await fresh();
 
   for (const [open, id] of [['#btn-settings', '#settings'], ['#btn-help', '#help'],
-                            ['#btn-stats', '#stats']]) {
+                            ['#btn-stats', '#stats'], ['#btn-more', '#more']]) {
     h.click(open);
     await h.tick();
     assert.equal(h.$(id).hidden, false, `${id} should have opened`);
@@ -492,7 +492,7 @@ test('restart replays the same puzzle from the start', async () => {
   const h = await fresh();
   const { state, neighbours } = h.bcp;
 
-  const seed = state.seed;
+  const start = [...state.board];
   h.bcp.slideTo([...neighbours(state.gap)][0], true);
   assert.equal(state.moves, 1);
 
@@ -500,14 +500,112 @@ test('restart replays the same puzzle from the start', async () => {
   await h.tick(2);
 
   assert.equal(state.moves, 0, 'restart resets the counter');
-  assert.equal(state.seed, seed, 'restart keeps the same puzzle');
+  // state.seed does not exist, so the old `seed` comparison here was undefined
+  // against undefined and passed no matter what restart did. Compare the board.
+  assert.deepEqual([...state.board], start, 'restart rebuilds the same puzzle');
   assert.equal(state.history.length, 0);
 
   h.close();
 });
 
-/* ---------------- modes ---------------- */
+/* ---------------- the board menu ---------------- */
 
+test('restart and new are reached through the board menu, not the action row', async () => {
+  const h = await fresh();
+
+  // The row's whole point is to stay short. Pin its membership, or the next
+  // person to add a control will quietly put it back to five across.
+  const rowIds = [...h.$('.action-row').children].map(b => b.id);
+  assert.deepEqual(rowIds, ['btn-undo', 'btn-hint', 'btn-more', 'btn-settings'],
+    'the action row holds the two play actions and the two sheet openers');
+
+  // jsdom will happily click a button inside a hidden sheet, so asserting the
+  // click works proves nothing. Assert where the buttons actually live.
+  assert.equal(h.$('#more').contains(h.$('#btn-restart')), true, 'restart lives in the menu');
+  assert.equal(h.$('#more').contains(h.$('#btn-new')), true, 'new lives in the menu');
+  assert.equal(h.$('#more').hidden, true, 'the menu starts closed');
+
+  h.click('#btn-more');
+  await h.tick();
+  assert.equal(h.$('#more').hidden, false, 'the action row must be able to open the menu');
+
+  h.click('#btn-restart');
+  await h.tick();
+  assert.equal(h.$('#more').hidden, true, 'acting from the menu closes it');
+
+  h.close();
+});
+
+test('a board with moves on it is never discarded without asking', async () => {
+  const h = await fresh();
+  const { neighbours } = h.bcp;
+
+  h.bcp.slideTo([...neighbours(h.bcp.state.gap)][0], true);
+  await h.tick();
+  const board = [...h.bcp.state.board];
+  assert.equal(h.bcp.state.moves, 1);
+
+  h.click('#btn-new');
+  await h.tick();
+  assert.equal(h.$('#confirm-new').hidden, false, 'progress in play must be defended');
+  assert.deepEqual([...h.bcp.state.board], board, 'the board must survive being asked about');
+
+  h.click('#btn-confirm-cancel');
+  await h.tick(2);
+  assert.equal(h.$('#confirm-new').hidden, true);
+  assert.deepEqual([...h.bcp.state.board], board, 'backing out keeps the board');
+  assert.equal(h.bcp.state.moves, 1, 'backing out keeps the progress too');
+
+  h.click('#btn-new');
+  await h.tick();
+  h.click('#btn-confirm-new');
+  await h.tick(2);
+  assert.equal(h.bcp.state.moves, 0, 'confirming deals a new board');
+  assert.notDeepEqual([...h.bcp.state.board], board, 'and it is a different one');
+
+  h.close();
+});
+
+test('an untouched board is replaced without a pointless question', async () => {
+  const h = await fresh();
+
+  assert.equal(h.bcp.state.moves, 0);
+  const board = [...h.bcp.state.board];
+
+  h.click('#btn-new');
+  await h.tick(2);
+
+  assert.equal(h.$('#confirm-new').hidden, true, 'nothing was at stake, so do not interrupt');
+  assert.notDeepEqual([...h.bcp.state.board], board, 'the new board should just be dealt');
+
+  h.close();
+});
+
+test('the menu warns about losing a board before it is chosen, not after', async () => {
+  const h = await fresh();
+  const { neighbours } = h.bcp;
+
+  // Nothing is at stake yet, so nothing should look alarming.
+  h.click('#btn-more');
+  await h.tick();
+  assert.equal(h.$('#btn-new').classList.contains('btn-danger'), false,
+    'an untouched board loses nothing, so do not cry wolf');
+  h.click('#btn-more-close');
+  await h.tick();
+
+  h.bcp.slideTo([...neighbours(h.bcp.state.gap)][0], true);
+  await h.tick();
+  assert.equal(h.bcp.state.moves, 1);
+
+  h.click('#btn-more');
+  await h.tick();
+  assert.equal(h.$('#btn-new').classList.contains('btn-danger'), true,
+    'once there is progress to lose, the menu must show which row costs it');
+
+  h.close();
+});
+
+/* ---------------- modes ---------------- */
 test('the daily is the same board all day and is shareable', async () => {
   const h = await fresh();
 
@@ -515,7 +613,16 @@ test('the daily is the same board all day and is shareable', async () => {
   await h.tick(2);
   const board = [...h.bcp.state.board];
 
-  h.click('#btn-new');
+  // The reshuffle is not offered at all in daily play. It used to be a greyed
+  // row explained only by a title tooltip, which does not exist on touch.
+  h.click('#btn-more');
+  await h.tick();
+  assert.equal(h.$('#btn-new').hidden, true, 'daily must not offer a reshuffle');
+  assert.equal(h.$('#daily-note').hidden, false, 'and it must say why, on screen');
+  h.click('#btn-more-close');
+  await h.tick();
+
+  h.bcp.newGame();
   await h.tick(2);
   assert.deepEqual([...h.bcp.state.board], board, 'the daily must not reroll');
 

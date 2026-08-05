@@ -106,11 +106,15 @@
     winNew:   document.getElementById('btn-win-new'),
     share:    document.getElementById('btn-share'),
     newBtn:   document.getElementById('btn-new'),
+    newLabel: document.getElementById('new-label'),
+    dailyNote: document.getElementById('daily-note'),
     levels:   document.getElementById('levels'),
     levelsGrid: document.getElementById('levels-grid'),
     levelsSummary: document.getElementById('levels-summary'),
     help:     document.getElementById('help'),
     settings: document.getElementById('settings'),
+    more:     document.getElementById('more'),
+    confirmNew: document.getElementById('confirm-new'),
     stats:    document.getElementById('stats'),
     statsGrid: document.getElementById('stats-grid'),
     statsSince: document.getElementById('stats-since'),
@@ -1191,9 +1195,13 @@
       b.classList.toggle('is-active', free && Number(b.dataset.rows) === state.rows);
     });
 
-    el.newBtn.disabled = state.mode === 'daily';
-    el.newBtn.textContent = levels ? 'Levels' : 'New';
-    el.newBtn.title = state.mode === 'daily' ? 'The daily puzzle is the same for everyone' : '';
+    // Daily used to show New greyed out, explained only by a title tooltip -
+    // which does not exist on touch. Drop the dead control, give the reason.
+    const daily = state.mode === 'daily';
+    el.newBtn.hidden = daily;
+    el.dailyNote.hidden = !daily;
+    // Write the label, not the button: textContent would wipe the icon.
+    el.newLabel.textContent = levels ? 'Choose a level' : 'New puzzle';
     el.winNew.textContent = levels ? 'Next level' : 'New puzzle';
     el.diffNote.hidden = free;
   }
@@ -1247,11 +1255,38 @@
     });
   });
 
+  const moreSheet = document.getElementById('more');
+  const confirmNew = document.getElementById('confirm-new');
+
+  document.getElementById('btn-more').addEventListener('click', () => {
+    // Mark the destructive choice where the choice is actually made, and only
+    // when it really is destructive - a board with no moves on it loses nothing.
+    const risky = state.moves > 0 && state.mode !== 'levels';
+    el.newBtn.classList.toggle('btn-danger', risky);
+    moreSheet.hidden = false;
+  });
+  document.getElementById('btn-more-close').addEventListener('click', () => { moreSheet.hidden = true; });
+  moreSheet.addEventListener('click', e => { if (e.target === moreSheet) moreSheet.hidden = true; });
+
   document.getElementById('btn-new').addEventListener('click', () => {
+    moreSheet.hidden = true;
     if (state.mode === 'levels') { openLevelPicker(); return; }
+    // Only a free board with moves on it has anything to lose: the daily never
+    // rerolls, and an untouched board has no progress to discard.
+    if (state.moves > 0) { confirmNew.hidden = false; return; }
     newGame();
   });
-  document.getElementById('btn-restart').addEventListener('click', restart);
+  document.getElementById('btn-confirm-new').addEventListener('click', () => {
+    confirmNew.hidden = true;
+    newGame();
+  });
+  document.getElementById('btn-confirm-cancel').addEventListener('click', () => { confirmNew.hidden = true; });
+  confirmNew.addEventListener('click', e => { if (e.target === confirmNew) confirmNew.hidden = true; });
+
+  document.getElementById('btn-restart').addEventListener('click', () => {
+    moreSheet.hidden = true;
+    restart();
+  });
   document.getElementById('btn-levels-close').addEventListener('click', () => { el.levels.hidden = true; });
   el.levels.addEventListener('click', e => { if (e.target === el.levels) el.levels.hidden = true; });
 
@@ -1326,7 +1361,9 @@
 
   // Arrow keys push a block in the pressed direction, into the gap.
   document.addEventListener('keydown', e => {
-    const openModal = !el.levels.hidden ? el.levels
+    const openModal = !el.confirmNew.hidden ? el.confirmNew
+      : !el.more.hidden ? el.more
+      : !el.levels.hidden ? el.levels
       : !el.stats.hidden ? el.stats
       : !el.settings.hidden ? el.settings
       : !el.help.hidden ? el.help : null;

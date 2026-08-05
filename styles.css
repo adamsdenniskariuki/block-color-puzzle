@@ -316,15 +316,43 @@ body {
 .seg-btn.is-active { background: var(--accent); color: #08121d; }
 .seg-btn:disabled { opacity: .38; cursor: default; }
 
+/* Icons are stroked, not filled, and follow the button's own colour - including
+   the dimmed disabled state - because they inherit currentColor. */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.icon {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Fills live on the symbol as presentation attributes: a descendant selector
+   like `.icon circle` cannot reach into the shadow tree that <use> clones. */
+
 .action-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) 46px;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) 46px 46px;
   gap: 8px;
 }
 
-.action-row .btn { padding: 11px 4px; font-size: 13px; min-height: 44px; }
+/* Two text pills instead of four, so the label can hold its normal size. */
+.action-row .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px 6px;
+  font-size: 14px;
+  min-height: 44px;
+}
 
-.btn-gear { font-size: 18px; line-height: 1; padding: 11px 0; }
+.btn-icon { padding: 11px 0; }
+.btn-icon .icon { width: 19px; height: 19px; }
 
 .btn {
   border: 1px solid var(--line-strong);
@@ -359,6 +387,34 @@ body {
 }
 
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #08121d; }
+
+/* The one action that destroys progress should not look like the safe ones. */
+.btn.btn-danger { border-color: #7c3b41; color: #ffb3b8; }
+.btn.btn-danger:hover { border-color: #a04c54; }
+
+/* Cancel is not the point of the sheet, so it must not out-shout the actions
+   it sits under. Quiet, borderless, centred - present but never the target. */
+.btn.btn-quiet { background: none; border-color: transparent; color: var(--text-dim); }
+.btn.btn-quiet:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+
+/* Stacked buttons in a sheet; .modal-card .btn already spans the full width.
+   Menu rows lead with their icon, so the labels align down the left edge. */
+.menu-list { display: grid; gap: 8px; }
+.menu-list .btn { display: flex; align-items: center; gap: 10px; text-align: left; }
+.menu-list .btn.primary,
+.menu-list .btn.btn-quiet { justify-content: center; }
+
+/* Replaces the disabled New row in daily mode: a reason, not a dead control.
+   Extra top margin so it reads as its own statement, not a caption on Restart. */
+.menu-note {
+  margin: 6px 0 2px;
+  padding: 0 2px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.confirm-note { margin: 0 0 16px; font-size: 14px; line-height: 1.5; color: var(--text-dim); }
 
 .toggles {
   display: grid;
@@ -737,8 +793,10 @@ body {
   .stage     { grid-area: stage; align-self: center; }
   .controls  { grid-area: controls; align-self: end; }
 
-  /* Five buttons will not fit across a 280px column, so wrap them. */
-  .action-row { grid-template-columns: repeat(2, minmax(0, 1fr)) 46px; }
+  /* Four buttons will not fit across a 280px column, so use a 2x2 block. This
+     is the same two rows the old five-button row already wrapped to, so the
+     sidebar height is unchanged. */
+  .action-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
