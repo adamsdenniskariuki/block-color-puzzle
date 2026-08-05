@@ -426,6 +426,30 @@ test('an unknown theme falls back to the default', async () => {
   h.close();
 });
 
+// Ocean was renamed to Jewel when its colours were redrawn, so anyone who had
+// picked it needs to land on Jewel rather than be quietly reset to Classic.
+test('a palette renamed after release keeps working for whoever had it', async () => {
+  const h = await fresh();
+  h.bcp.setPalette('jewel');
+  await h.tick();
+  const stored = h.storage();
+  h.close();
+
+  assert.equal(stored.palette, 'jewel', 'the palette should have been saved at all');
+
+  stored.palette = 'ocean';
+  const again = await fresh({ storage: stored });
+  assert.equal(again.bcp.state.palette, 'jewel',
+    'the old id should forward to the new one, not fall back to classic');
+  again.close();
+});
+
+test('an unknown palette falls back to the default', async () => {
+  const h = await fresh({ storage: { palette: 'ultraviolet' } });
+  assert.equal(h.bcp.state.palette, 'classic');
+  h.close();
+});
+
 test('every palette and appearance is offered as a control', async () => {
   const h = await fresh();
 

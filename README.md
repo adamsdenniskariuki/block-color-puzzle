@@ -81,13 +81,17 @@ than on every slide, so playing stays cheap.
 
 The settings sheet carries two appearance controls:
 
-- **Colours** — four palettes. `Classic` is the original board, `Accessible` uses
-  the Okabe-Ito set chosen for maximum separation under the common forms of
-  colour blindness, plus `Candy` and `Ocean`. Switching repaints the blocks in
-  place, so your board and timer survive the change.
-- **Appearance** — `Dark`, `Midnight` or `Slate` re-tints the surfaces around the
-  board. The board frame itself stays light in every theme because the block
-  colours are tuned against it.
+- **Colours** — four palettes, each on a different part of the colour wheel so
+  switching changes the board rather than just its saturation. `Classic` is the
+  original board, `Accessible` uses the Okabe-Ito set chosen for maximum
+  separation under the common forms of colour blindness, plus the bright `Candy`
+  and the deeper `Jewel`. Switching repaints the blocks in place, so your board
+  and timer survive the change. `tests/palette.test.mjs` holds every palette to a
+  measured minimum separation, both within itself and against the others.
+- **Appearance** — eight themes, from `Dark` and `Midnight` through `Slate`,
+  `Forest`, `Plum` and `Amber` to the light `Light` and `Paper`, re-tinting the
+  surfaces around the board. The board frame itself stays light in every theme
+  because the block colours are tuned against it.
 
 Symbols are keyed to the colour's *slot*, not the palette, so a shape always
 means the same column no matter which palette you pick. Both choices persist.
@@ -111,7 +115,7 @@ out of the way.
 | Lifetime stats | **📊** in the topbar |
 | Mode | ⚙ — Free play (endless random boards), Daily (one shared puzzle a day), or Levels (24-puzzle campaign) |
 | Difficulty | ⚙ — Easy (4 rows) / Normal (5) / Hard (6) — free play only |
-| Colours | ⚙ — Classic / Accessible / Candy / Ocean |
+| Colours | ⚙ — Classic / Accessible / Candy / Jewel |
 | Appearance | ⚙ — Dark / Midnight / Slate |
 | Colour hints | ⚙ toggle — dims every block that is in the wrong column |
 | Symbols | ⚙ toggle — adds a shape to each colour for colourblind play |

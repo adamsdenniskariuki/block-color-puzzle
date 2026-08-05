@@ -5,9 +5,10 @@
   "description": "A sliding-block colour-sorting puzzle, built as an installable PWA.",
   "type": "module",
   "scripts": {
-    "test": "node --test tests/unit.test.mjs tests/integration.test.mjs",
+    "test": "node --test tests/unit.test.mjs tests/integration.test.mjs tests/palette.test.mjs",
     "test:unit": "node --test tests/unit.test.mjs",
     "test:integration": "node --test tests/integration.test.mjs",
+    "test:palette": "node --test tests/palette.test.mjs",
     "test:layout": "node --test tests/layout.test.mjs",
     "test:all": "node --test \"tests/*.test.mjs\"",
     "serve": "npx --yes http-server -p 8123 -c-1 ."

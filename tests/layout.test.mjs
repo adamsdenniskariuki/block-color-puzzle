@@ -674,3 +674,53 @@ test('a theme previewed inside another theme still looks like itself', async (t)
 
   await context.close();
 });
+
+// The settings swatches put a fixed-width preview and a label on one line, so
+// the label is what runs out of room. It is a single unbreakable word, so it
+// does not wrap - it spills straight out of the rounded card, which looks far
+// worse than the stacked layout it replaced. Narrow phones fall back to
+// stacking for exactly this reason, and this is the test that decides whether
+// that threshold sits in the right place.
+test('settings swatch labels stay inside their cards', async (t) => {
+  const context = await browser.newContext();
+  context.setDefaultTimeout(15000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+
+  for (const vp of VIEWPORTS) {
+    await t.test(vp.name, async () => {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.goto(`${server.url}/index.html`);
+      await page.waitForFunction(() => Boolean(window.__bcp));
+      await page.evaluate(() => { document.getElementById('settings').hidden = false; });
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+
+      const labels = await page.evaluate(() => {
+        const out = [];
+        for (const sw of document.querySelectorAll('#palette-row .swatch, #appearance-row .swatch')) {
+          const name = sw.querySelector('.swatch-name');
+          const card = sw.getBoundingClientRect();
+          const label = name.getBoundingClientRect();
+          const pad = parseFloat(getComputedStyle(sw).paddingRight);
+          out.push({
+            text: name.textContent,
+            spill: Math.round(label.right - (card.right - pad)),
+            // An ellipsis is not an acceptable outcome either - the whole point
+            // of the label is that it can be read.
+            clipped: name.scrollWidth > name.clientWidth + 1
+          });
+        }
+        return out;
+      });
+
+      assert.ok(labels.length > 0, 'found no swatches - the picker did not render');
+
+      for (const o of labels) {
+        assert.ok(o.spill <= 1, `"${o.text}" overflows its card by ${o.spill}px`);
+        assert.ok(!o.clipped, `"${o.text}" is truncated rather than shown in full`);
+      }
+    });
+  }
+
+  await context.close();
+});

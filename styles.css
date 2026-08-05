@@ -726,8 +726,11 @@ body {
 
 /* ---------- settings sheet ---------- */
 
+/* Every heading spaces itself off whatever came before it. This used to be a
+   list of previous-sibling types (.seg, .toggles), so a heading that followed
+   anything else - a swatch row, say - silently got no gap at all. */
 .field-label {
-  margin: 0 0 7px;
+  margin: 18px 0 7px;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -735,7 +738,8 @@ body {
   color: var(--text-dim);
 }
 
-.seg + .field-label, .toggles + .field-label { margin-top: 18px; }
+.field-label:first-child,
+h2 + .field-label { margin-top: 0; }
 
 .field-note {
   margin: 8px 0 0;
@@ -745,7 +749,6 @@ body {
 }
 
 #settings .toggles { margin-bottom: 20px; }
-#settings .seg-diff + .field-note + .field-label { margin-top: 18px; }
 
 /* ---------- level picker ---------- */
 
@@ -825,10 +828,10 @@ body {
 
 .swatch {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 9px 10px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
   border-radius: 11px;
   border: 1px solid var(--line-strong);
   background: var(--bg-soft);
@@ -843,28 +846,35 @@ body {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
+/* Five 12px chips plus the longest palette name do not fit on one line at any
+   common phone width, so the chips overlap like a stack of cards - 44px instead
+   of 68px - and each carries a ring in the card colour to stay separable. */
 .swatch-chips {
   display: flex;
-  gap: 3px;
+  flex: none;
+  gap: 0;
 }
 
 .swatch-chips span {
-  width: 15px;
-  height: 15px;
-  border-radius: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1.5px var(--bg-soft);
 }
+
+.swatch-chips span + span { margin-left: -4px; }
 
 .swatch-name {
   font-size: 12px;
   font-weight: 600;
+  /* Wrapping is ugly but readable; an ellipsis on "Accessible" is neither. */
+  min-width: 0;
 }
 
 /* Each theme swatch re-scopes the theme variables onto itself, so the row is
    its own preview - background, text and accent all come from the theme it is
    offering while the modal around it stays in the current one. */
 .swatch-theme {
-  flex-direction: row;
-  align-items: center;
   gap: 8px;
   padding: 8px 10px;
   background: var(--bg);
@@ -915,6 +925,29 @@ body {
   font-size: 16px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
+}
+
+/* The inline palette row needs about 107px inside each card for the chips plus
+   the longest name. Two columns only provide that from roughly 380px up, and
+   below it the name is a single unbreakable word that would spill outside the
+   card, so narrow phones keep the original stacked card instead. Theme swatches
+   are unaffected - one dot and a short name fit at every width. */
+@media (max-width: 379px) {
+  #palette-row .swatch {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  #palette-row .swatch-chips { gap: 3px; }
+
+  #palette-row .swatch-chips span {
+    width: 15px;
+    height: 15px;
+    border-radius: 4px;
+    box-shadow: none;
+    margin-left: 0;
+  }
 }
 
 /* Short viewports - a phone or tablet in landscape, or a small desktop window -

@@ -155,6 +155,16 @@ passed on every isolated re-run. If it fails alone, believe it. If it fails only
 - **The landscape breakpoint is `min-width: 520px`, not 600px.** A 568×320 landscape
   iPhone SE sits between the two; at 600px it fell back to the stacked layout and
   overflowed the viewport by 67px at six rows.
+- **A single unbreakable word does not wrap -- it spills clean outside its flex item.**
+  This is why the one-line settings swatches have a `max-width: 379px` fallback that puts
+  the palette card back to stacked. The width budget was measured, not guessed: at 360px
+  a swatch cell gives 107px of inner room, five 12px chips overlapped at -4px cost 44px,
+  and "Accessible" costs 63px, so it is exactly borderline at 360 and overflows at 320.
+  iPhone SE 320x568 is in the supported matrix, so that fallback is load-bearing.
+  Ellipsis was rejected deliberately -- the label exists to be read.
+- **Sibling-specific spacing rules rot.** `.seg + .field-label` silently gave zero top
+  margin to every heading that happened to follow a new section type. Prefer a general
+  `.field-label` margin plus `:first-child` / `h2 +` exceptions.
 
 ## Theme traps
 
@@ -200,6 +210,29 @@ passed on every isolated re-run. If it fails alone, believe it. If it fails only
   `tests/layout.test.mjs` (real Chromium). It asserts every appearance applies, has a
   unique background, and clears 4.5:1 for both body text and text-on-accent. A typo'd
   selector shows up as a duplicate background.
+
+## Palette traps
+
+- **Palettes are separated by hue rotation, not saturation.** All four originally walked
+  the same red-green-blue-purple-yellow wheel and differed only in saturation and
+  lightness, so switching read as one palette with a slider. Each now sits at its own
+  rotation. `tests/palette.test.mjs` measures CIELAB distance between palettes slot for
+  slot and fails below dE 30.
+- **A palette whose colours sit close together is a difficulty bug, not a style choice.**
+  The whole game is telling five colours apart. The original `Ocean` shipped with a blue
+  and an indigo dE 20.5 apart against Classic's 59.2, which made it materially harder to
+  play, and nothing caught it because no test looked at the colours. The same file now
+  enforces a within-palette floor of dE 45.
+- **"Ocean" is why that happened, and the lesson generalises**: a palette named after
+  something monochrome forces five hues into one corner of the wheel and they collide.
+  It was renamed `Jewel` so the colours could spread out. Check a palette concept admits
+  five well-separated hues *before* picking the name.
+- **`Accessible` is the Okabe-Ito set and must not be retuned.** It buys colour-blind
+  safety at the cost of raw separation (dE 33 within, 28 against Classic), so it has its
+  own lower floors in the tests. Everything else gets the higher ones.
+- **Renaming a palette id breaks saved prefs** exactly like renaming a theme id does --
+  `loadPrefs` validates against `PALETTES` and silently drops the player back to
+  `classic`. Add a `PALETTE_ALIASES` entry, same as `APPEARANCE_ALIASES`.
 
 ## SVG icon traps
 

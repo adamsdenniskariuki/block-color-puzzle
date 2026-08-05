@@ -16,9 +16,14 @@
   // never changes what a shape means.
   const SYMBOLS = ['\u25CF', '\u25B2', '\u25A0', '\u25C6', '\u2605'];
 
-  // Every palette needs five colours that stay distinguishable at tile size.
-  // "Accessible" is the Okabe-Ito set, chosen so the three common forms of
-  // colour blindness still separate all five.
+  // Every palette needs five colours that stay distinguishable at tile size, and
+  // the palettes need to be distinguishable from *each other* or switching just
+  // looks like a saturation slider. Both are enforced by tests/palette.test.mjs,
+  // which measures CIELAB distance -- the original Ocean set failed the first
+  // rule (its blue and indigo were dE 20 apart) because "ocean" forces five
+  // cool hues into a corner of the wheel. "Accessible" is the Okabe-Ito set,
+  // chosen so the three common forms of colour blindness still separate all
+  // five, and it is exempt from the within-palette floor for that reason.
   const PALETTES = {
     classic: {
       name: 'Classic',
@@ -43,24 +48,29 @@
     candy: {
       name: 'Candy',
       colours: [
-        { name: 'Cherry',     hex: '#ff5d73' },
-        { name: 'Mint',       hex: '#3ddc97' },
-        { name: 'Cornflower', hex: '#5b8cff' },
-        { name: 'Grape',      hex: '#b47aea' },
-        { name: 'Lemon',      hex: '#ffd93d' }
+        { name: 'Bubblegum', hex: '#ff8387' },
+        { name: 'Lemon',     hex: '#ffd24a' },
+        { name: 'Mint',      hex: '#00ca98' },
+        { name: 'Aqua',      hex: '#00c4ff' },
+        { name: 'Lilac',     hex: '#d099ff' }
       ]
     },
-    ocean: {
-      name: 'Ocean',
+    jewel: {
+      name: 'Jewel',
       colours: [
-        { name: 'Coral',   hex: '#ef6f6c' },
-        { name: 'Seafoam', hex: '#1eb896' },
-        { name: 'Deep',    hex: '#2b6cb0' },
-        { name: 'Ink',     hex: '#5a5fb8' },
-        { name: 'Shell',   hex: '#f2c14e' }
+        { name: 'Bronze',   hex: '#bf6c2b' },
+        { name: 'Moss',     hex: '#529034' },
+        { name: 'Teal',     hex: '#0098a7' },
+        { name: 'Sapphire', hex: '#1483e2' },
+        { name: 'Rose',     hex: '#cf5597' }
       ]
     }
   };
+
+  // Palettes renamed after release, same forwarding rule as APPEARANCE_ALIASES:
+  // loadPrefs validates against PALETTES, so a saved id that no longer exists
+  // would silently drop the player back to classic.
+  const PALETTE_ALIASES = { ocean: 'jewel' };
 
   const APPEARANCES = {
     dark:     'Dark',
@@ -340,7 +350,8 @@
     el.sound.checked = store.sound !== false;
     el.haptics.checked = store.haptics !== false;
     if (store.rows && [4, 5, 6].includes(store.rows)) state.rows = store.rows;
-    if (store.palette && PALETTES[store.palette]) state.palette = store.palette;
+    const savedPalette = PALETTE_ALIASES[store.palette] || store.palette;
+    if (savedPalette && PALETTES[savedPalette]) state.palette = savedPalette;
     const saved = APPEARANCE_ALIASES[store.appearance] || store.appearance;
     if (saved && APPEARANCES[saved]) state.appearance = saved;
     applyTheme();
@@ -1522,6 +1533,7 @@
       loadStats, saveStats, bumpStats, renderStats, statsRows, bestRows,
       formatLong, formatTime, totalStars,
       setPalette, setAppearance, palette, colourHex, PALETTES, APPEARANCES,
+      PALETTE_ALIASES, APPEARANCE_ALIASES,
       loadStore, saveStore, getBest, recordBest, loadPrefs, savePrefs,
       seedFrom, mulberry32, shuffled, neighbours, buildSolved, scramble,
       renderBoard, renderGuide, layout,
