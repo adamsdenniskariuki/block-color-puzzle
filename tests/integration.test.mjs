@@ -205,7 +205,7 @@ test('undo unwinds a run slide in one step', async () => {
 
 /* ---------------- hints ---------------- */
 
-test('a hint costs one of three and disables the button at zero', async () => {
+test('three changed positions spend the allowance, then the final hint repeats until a move', async () => {
   const h = await fresh();
   const badge = h.$('#hint-badge');
   const button = h.$('#btn-hint');
@@ -220,11 +220,51 @@ test('a hint costs one of three and disables the button at zero', async () => {
     if (left > 0) {
       assert.equal(badge.textContent, String(left), 'the badge tracks what is left');
       assert.equal(button.disabled, false);
+
+      // A repeated request on the same position is free. Make the hinted move
+      // so the next press asks about a genuinely new board position.
+      h.bcp.slideTo(h.bcp.state.hintCell, true);
+      await h.tick();
+    } else {
+      const finalCell = h.bcp.state.hintCell;
+      h.click('#btn-hint');
+      await h.tick();
+      assert.equal(h.bcp.state.hintCell, finalCell, 'the last hint can still be repeated for free');
+      assert.equal(h.bcp.state.hintsLeft, 0, 'repeating the last hint cannot make the count negative');
+      assert.equal(button.disabled, false, 'the active final hint remains repeatable');
+
+      h.bcp.slideTo(finalCell, true);
+      await h.tick();
     }
   }
 
-  assert.equal(button.disabled, true, 'the button locks once hints run out');
+  assert.equal(button.disabled, true, 'the button locks after the final hinted move');
   assert.equal(badge.hidden, true, 'a zero badge is hidden rather than shown');
+
+  h.close();
+});
+
+test('repeating a hint before moving shows the same move and counts only once', async () => {
+  const h = await fresh();
+
+  h.click('#btn-hint');
+  await h.waitFor(() => h.bcp.state.hintCell >= 0, { label: 'the first hint' });
+
+  const cell = h.bcp.state.hintCell;
+  const left = h.bcp.state.hintsLeft;
+  const lifetime = h.bcp.loadStats().hints;
+  const tile = h.bcp.state.tiles[cell];
+
+  h.solver.solveHard = () => { throw new Error('the same position must not be solved twice'); };
+  h.click('#btn-hint');
+  assert.equal(tile.classList.contains('is-hint'), false,
+    'repeating the hint should restart its visual pulse');
+  await h.waitFor(() => tile.classList.contains('is-hint'), { label: 'the same hint to be shown again' });
+
+  assert.equal(h.bcp.state.hintCell, cell, 'the recommendation must stay on the same tile');
+  assert.equal(h.bcp.state.hintsLeft, left, 'the repeated hint must not spend another allowance');
+  assert.equal(h.bcp.loadStats().hints, lifetime, 'lifetime hint stats count the position only once');
+  assert.deepEqual(h.$$('#board .tile.is-hint'), [tile], 'exactly the same tile is highlighted again');
 
   h.close();
 });

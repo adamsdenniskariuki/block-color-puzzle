@@ -620,12 +620,33 @@
     el.hintBadge.hidden = left <= 0;
     el.hintBadge.textContent = String(left);
     el.hint.setAttribute('aria-label',
-      left > 0 ? 'Hint, ' + left + ' remaining' : 'Hint, none remaining');
-    el.hint.disabled = state.solved || left <= 0;
+      left > 0 ? 'Hint, ' + left + ' remaining'
+        : state.hintCell >= 0 ? 'Repeat hint, none remaining' : 'Hint, none remaining');
+    el.hint.disabled = state.solved || (left <= 0 && state.hintCell < 0);
   }
 
   function showHint() {
-    if (state.solved || state.hintsLeft <= 0) return;
+    if (state.solved) return;
+
+    // A hint belongs to the current board position. Repeating it before a move
+    // should reinforce the same answer, not charge for solving the same state
+    // again. Removing the class for one frame restarts the visual pulse.
+    if (state.hintCell >= 0) {
+      const cell = state.hintCell;
+      const tile = state.tiles[cell];
+      if (tile) {
+        tile.classList.remove('is-hint');
+        requestAnimationFrame(() => {
+          if (state.hintCell !== cell || state.tiles[cell] !== tile) return;
+          tile.classList.add('is-hint');
+          FX.sound.click();
+          FX.haptics.slide(1);
+        });
+        return;
+      }
+    }
+
+    if (state.hintsLeft <= 0) return;
     clearHint();
 
     el.hint.disabled = true;
