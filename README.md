@@ -32,7 +32,7 @@ short; that column ends up holding the empty slot.
 
 **Daily** builds one puzzle per UTC date from a seeded generator, so everyone
 gets the same board on the same day. It is always Normal (5 rows), and the
-**New** button is locked so the board cannot be rerolled — **Restart** replays it.
+**New board** button is hidden so the board cannot be rerolled — **Restart** replays it.
 
 Solving it banks a result and extends your streak. Miss a day and the streak
 resets, but your best streak is kept. **Share** copies a spoiler-free summary:
@@ -102,10 +102,13 @@ means the same column no matter which palette you pick. Both choices persist.
 
 ## Controls
 
-Four buttons sit under the board — **Undo**, **Hint**, **Restart**, **New** —
-plus a **⚙** button that opens a settings sheet holding mode, difficulty,
-colours, appearance and the four toggles. Those are set-and-forget, so they stay
-out of the way.
+Mode sits above the HUD so **Free play**, **Daily** and **Levels** are always one
+tap away. **New board** sits beside it in Free play, becomes **Choose level** in
+Levels, and disappears in Daily because that puzzle cannot be rerolled.
+
+Four buttons sit under the board — **Undo**, **Hint**, **Restart**, and **⚙**.
+The gear opens a settings sheet holding difficulty, colours, appearance and the
+four set-and-forget toggles.
 
 | Action | How |
 | --- | --- |
@@ -116,9 +119,9 @@ out of the way.
 | Undo | **Undo** button — steps back one tap |
 | Ask for a nudge | **Hint** — rings the next block to move, three per puzzle |
 | Reshuffle the same layout | **Restart** — replays the identical starting board |
-| Fresh puzzle | **New** |
+| Fresh puzzle | **New board** beside the mode control |
 | Lifetime stats | **📊** in the topbar |
-| Mode | ⚙ — Free play (endless random boards), Daily (one shared puzzle a day), or Levels (24-puzzle campaign) |
+| Mode | Main screen — Free play (endless random boards), Daily (one shared puzzle a day), or Levels (24-puzzle campaign) |
 | Difficulty | ⚙ — Easy (4 rows) / Normal (5) / Hard (6) — free play only |
 | Colours | ⚙ — Classic / Accessible / Candy / Jewel |
 | Appearance | ⚙ — Dark / Midnight / Slate / Forest / Plum / Amber / Light / Paper |

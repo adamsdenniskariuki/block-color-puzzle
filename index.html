@@ -25,11 +25,6 @@
     <path d="M10 21h4"/>
     <path d="M12 3a6 6 0 0 0-3.6 10.8c.5.4.8.9.9 1.5l.1.7h5.2l.1-.7c.1-.6.4-1.1.9-1.5A6 6 0 0 0 12 3Z"/>
   </symbol>
-  <symbol id="i-more" viewBox="0 0 24 24">
-    <circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/>
-    <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
-    <circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>
-  </symbol>
   <symbol id="i-settings" viewBox="0 0 24 24">
     <circle cx="12" cy="12" r="3.2"/>
     <path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/>
@@ -61,13 +56,26 @@
     </div>
   </header>
 
+  <section class="mode-panel" aria-label="Puzzle mode">
+    <div class="mode-row">
+      <div class="seg seg-mode" role="group" aria-label="Game mode">
+        <button class="seg-btn is-active" type="button" data-mode="free">Free play</button>
+        <button class="seg-btn" type="button" data-mode="daily">Daily</button>
+        <button class="seg-btn" type="button" data-mode="levels">Levels</button>
+      </div>
+      <button id="btn-new" class="btn" type="button" aria-label="New board">
+        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-new"/></svg>
+        <span id="new-label">New board</span>
+      </button>
+    </div>
+    <p id="mode-note" class="mode-note" aria-live="polite"></p>
+  </section>
+
   <section class="hud" aria-label="Game statistics">
     <div class="stat"><span class="stat-label">Time</span><span id="stat-time" class="stat-value">0:00</span></div>
     <div class="stat"><span class="stat-label">Moves</span><span id="stat-moves" class="stat-value">0</span></div>
     <div class="stat"><span id="stat-best-label" class="stat-label">Best</span><span id="stat-best" class="stat-value">—</span></div>
   </section>
-
-  <p id="mode-note" class="mode-note" hidden></p>
 
   <main class="stage">
     <div class="frame">
@@ -108,9 +116,9 @@
         <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-hint"/></svg>
         <span>Hint</span><span id="hint-badge" class="btn-badge" aria-hidden="true">3</span>
       </button>
-      <button id="btn-more" class="btn btn-icon" type="button"
-              aria-label="Board actions" aria-haspopup="dialog">
-        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-more"/></svg>
+      <button id="btn-restart" class="btn" type="button">
+        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-restart"/></svg>
+        <span>Restart</span>
       </button>
       <button id="btn-settings" class="btn btn-icon" type="button"
               aria-label="Settings" aria-haspopup="dialog">
@@ -119,24 +127,6 @@
     </div>
   </section>
 
-</div>
-
-<div id="more" class="modal" hidden>
-  <div class="modal-card">
-    <h2>Board</h2>
-    <div class="menu-list">
-      <button id="btn-restart" class="btn" type="button">
-        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-restart"/></svg>
-        <span>Restart this puzzle</span>
-      </button>
-      <button id="btn-new" class="btn" type="button">
-        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-new"/></svg>
-        <span id="new-label">New puzzle</span>
-      </button>
-      <p id="daily-note" class="menu-note" hidden>Everyone gets the same daily puzzle, so it cannot be reshuffled. Come back tomorrow for the next one.</p>
-      <button id="btn-more-close" class="btn btn-quiet" type="button">Cancel</button>
-    </div>
-  </div>
 </div>
 
 <div id="confirm-new" class="modal" hidden>
@@ -153,13 +143,6 @@
 <div id="settings" class="modal" hidden>
   <div class="modal-card">
     <h2>Settings</h2>
-
-    <p class="field-label" id="lbl-mode">Mode</p>
-    <div class="seg seg-mode" role="group" aria-labelledby="lbl-mode">
-      <button class="seg-btn is-active" type="button" data-mode="free">Free play</button>
-      <button class="seg-btn" type="button" data-mode="daily">Daily</button>
-      <button class="seg-btn" type="button" data-mode="levels">Levels</button>
-    </div>
 
     <p class="field-label" id="lbl-diff">Difficulty</p>
     <div class="seg seg-diff" role="group" aria-labelledby="lbl-diff">

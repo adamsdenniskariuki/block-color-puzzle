@@ -201,10 +201,10 @@ body {
 .app {
   width: 100%;
   max-width: 520px;
-  padding: max(12px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
+  padding: max(12px, env(safe-area-inset-top)) 8px max(14px, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 /* ---------- top bar ---------- */
@@ -238,7 +238,28 @@ body {
 
 .icon-btn:hover { color: var(--text); border-color: var(--accent); }
 
-/* ---------- hud ---------- */
+/* ---------- mode and hud ---------- */
+
+.mode-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mode-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.mode-row #btn-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 100px;
+  white-space: nowrap;
+}
 
 .hud {
   display: grid;
@@ -286,13 +307,18 @@ body {
 
 /* ---------- board ---------- */
 
-.stage { position: relative; }
+.stage {
+  position: relative;
+  width: 100%;
+  max-width: 432px;
+  align-self: center;
+}
 
 .frame {
   background: var(--frame);
   border: 1px solid var(--frame-edge);
   border-radius: var(--radius);
-  padding: 10px;
+  padding: 8px;
   box-shadow: var(--board-shadow);
 }
 
@@ -464,14 +490,17 @@ body {
 .win-stars .earned { color: #fbc02d; }
 .win-stars .missed { color: var(--line-bright); }
 
-.daily-note,
 .mode-note {
+  height: 32px;
   margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   font-size: 12.5px;
+  line-height: 1.25;
   color: var(--text-dim);
 }
-.daily-note strong,
 .mode-note strong { color: var(--accent); font-weight: 600; }
 
 /* ---------- controls ---------- */
@@ -524,11 +553,10 @@ body {
 
 .action-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) 46px 46px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) 46px;
   gap: 8px;
 }
 
-/* Two text pills instead of four, so the label can hold its normal size. */
 .action-row .btn {
   display: flex;
   align-items: center;
@@ -591,16 +619,6 @@ body {
 .menu-list .btn { display: flex; align-items: center; gap: 10px; text-align: left; }
 .menu-list .btn.primary,
 .menu-list .btn.btn-quiet { justify-content: center; }
-
-/* Replaces the disabled New row in daily mode: a reason, not a dead control.
-   Extra top margin so it reads as its own statement, not a caption on Restart. */
-.menu-note {
-  margin: 6px 0 2px;
-  padding: 0 2px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--text-dim);
-}
 
 .confirm-note { margin: 0 0 16px; font-size: 14px; line-height: 1.5; color: var(--text-dim); }
 
@@ -1029,20 +1047,24 @@ h2 + .field-label { margin-top: 0; }
     grid-template-rows: auto auto auto 1fr;
     grid-template-areas:
       "stage topbar"
+      "stage mode"
       "stage hud"
-      "stage note"
       "stage controls";
   }
 
   .topbar    { grid-area: topbar; }
+  .mode-panel { grid-area: mode; gap: 4px; }
   .hud       { grid-area: hud; }
-  .mode-note { grid-area: note; }
   .stage     { grid-area: stage; align-self: center; }
   .controls  { grid-area: controls; align-self: end; }
 
-  /* Four buttons will not fit across a 280px column, so use a 2x2 block. This
-     is the same two rows the old five-button row already wrapped to, so the
-     sidebar height is unchanged. */
+  .mode-row { grid-template-columns: minmax(0, 1fr) 40px; gap: 6px; }
+  .mode-row #btn-new { min-width: 40px; padding: 0; }
+  .mode-row #new-label { display: none; }
+  .mode-row .seg-btn { padding: 7px 2px; font-size: 11px; }
+  .mode-note { height: 28px; font-size: 11px; }
+
+  /* Four buttons will not fit across a 280px column, so use a 2x2 block. */
   .action-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 

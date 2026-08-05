@@ -128,13 +128,11 @@
     share:    document.getElementById('btn-share'),
     newBtn:   document.getElementById('btn-new'),
     newLabel: document.getElementById('new-label'),
-    dailyNote: document.getElementById('daily-note'),
     levels:   document.getElementById('levels'),
     levelsGrid: document.getElementById('levels-grid'),
     levelsSummary: document.getElementById('levels-summary'),
     help:     document.getElementById('help'),
     settings: document.getElementById('settings'),
-    more:     document.getElementById('more'),
     confirmNew: document.getElementById('confirm-new'),
     stats:    document.getElementById('stats'),
     statsGrid: document.getElementById('stats-grid'),
@@ -835,7 +833,8 @@
       - el.guide.getBoundingClientRect().height
       - el.board.getBoundingClientRect().height;
 
-    // Where the stage begins is fixed by the header, HUD and note above it.
+    // Where the stage begins is fixed by the header, mode panel (including its
+    // permanently reserved note) and HUD above it.
     const stageRect = stage.getBoundingClientRect();
     const controlsRect = controls.getBoundingClientRect();
     const stageTop = stageRect.top + window.scrollY;
@@ -1035,6 +1034,8 @@
       el.best.textContent = best ? formatTime(best.ms) : '\u2014';
     }
 
+    el.newBtn.classList.toggle('btn-danger', state.mode === 'free' && state.moves > 0);
+
     // Every board mutation lands here, so this is the one hook that cannot go
     // stale as the game grows. The timer writes el.time directly and does not
     // come through updateHud, so this is not a once-a-tick write.
@@ -1057,7 +1058,6 @@
       if (done) bits.push('solved in ' + formatTime(done.ms));
       if (daily.streak) bits.push('streak ' + daily.streak);
       el.modeNote.innerHTML = bits.join(' \u00b7 ');
-      el.modeNote.hidden = false;
       return;
     }
 
@@ -1067,11 +1067,10 @@
         'par ' + state.par + ' moves'];
       if (best) bits.push(starMarkup(best.stars) + ' best ' + best.moves);
       el.modeNote.innerHTML = bits.join(' \u00b7 ');
-      el.modeNote.hidden = false;
       return;
     }
 
-    el.modeNote.hidden = true;
+    el.modeNote.textContent = '';
   }
 
   function finish() {
@@ -1475,13 +1474,11 @@
       b.classList.toggle('is-active', free && Number(b.dataset.rows) === state.rows);
     });
 
-    // Daily used to show New greyed out, explained only by a title tooltip -
-    // which does not exist on touch. Drop the dead control, give the reason.
     const daily = state.mode === 'daily';
     el.newBtn.hidden = daily;
-    el.dailyNote.hidden = !daily;
     // Write the label, not the button: textContent would wipe the icon.
-    el.newLabel.textContent = levels ? 'Choose a level' : 'New puzzle';
+    el.newLabel.textContent = levels ? 'Choose level' : 'New board';
+    el.newBtn.setAttribute('aria-label', levels ? 'Choose level' : 'New board');
     el.winNew.textContent = levels ? 'Next level' : 'New puzzle';
     el.diffNote.hidden = free;
   }
@@ -1528,28 +1525,12 @@
   }
 
   document.querySelectorAll('.seg-mode .seg-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      // Changing mode deals a new board, so get the sheet out of the way.
-      el.settings.hidden = true;
-      setMode(btn.dataset.mode);
-    });
+    btn.addEventListener('click', () => { setMode(btn.dataset.mode); });
   });
 
-  const moreSheet = document.getElementById('more');
   const confirmNew = document.getElementById('confirm-new');
 
-  document.getElementById('btn-more').addEventListener('click', () => {
-    // Mark the destructive choice where the choice is actually made, and only
-    // when it really is destructive - a board with no moves on it loses nothing.
-    const risky = state.moves > 0 && state.mode !== 'levels';
-    el.newBtn.classList.toggle('btn-danger', risky);
-    moreSheet.hidden = false;
-  });
-  document.getElementById('btn-more-close').addEventListener('click', () => { moreSheet.hidden = true; });
-  moreSheet.addEventListener('click', e => { if (e.target === moreSheet) moreSheet.hidden = true; });
-
   document.getElementById('btn-new').addEventListener('click', () => {
-    moreSheet.hidden = true;
     if (state.mode === 'levels') { openLevelPicker(); return; }
     // Only a free board with moves on it has anything to lose: the daily never
     // rerolls, and an untouched board has no progress to discard.
@@ -1564,7 +1545,6 @@
   confirmNew.addEventListener('click', e => { if (e.target === confirmNew) confirmNew.hidden = true; });
 
   document.getElementById('btn-restart').addEventListener('click', () => {
-    moreSheet.hidden = true;
     restart();
   });
   document.getElementById('btn-levels-close').addEventListener('click', () => { el.levels.hidden = true; });
@@ -1642,7 +1622,6 @@
   // Arrow keys push a block in the pressed direction, into the gap.
   document.addEventListener('keydown', e => {
     const openModal = !el.confirmNew.hidden ? el.confirmNew
-      : !el.more.hidden ? el.more
       : !el.levels.hidden ? el.levels
       : !el.stats.hidden ? el.stats
       : !el.settings.hidden ? el.settings

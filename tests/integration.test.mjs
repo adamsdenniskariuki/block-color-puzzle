@@ -341,7 +341,7 @@ test('Escape closes an open modal', async () => {
   const h = await fresh();
 
   for (const [open, id] of [['#btn-settings', '#settings'], ['#btn-help', '#help'],
-                            ['#btn-stats', '#stats'], ['#btn-more', '#more']]) {
+                            ['#btn-stats', '#stats']]) {
     h.click(open);
     await h.tick();
     assert.equal(h.$(id).hidden, false, `${id} should have opened`);
@@ -853,30 +853,26 @@ test('restart replays the same puzzle from the start', async () => {
   h.close();
 });
 
-/* ---------------- the board menu ---------------- */
+/* ---------------- primary controls ---------------- */
 
-test('restart and new are reached through the board menu, not the action row', async () => {
+test('mode and board actions are placed on the main screen in task order', async () => {
   const h = await fresh();
 
-  // The row's whole point is to stay short. Pin its membership, or the next
-  // person to add a control will quietly put it back to five across.
+  const sections = [...h.$('.app').children]
+    .filter((node) => node.id !== 'board-status')
+    .map((node) => node.classList[0]);
+  assert.deepEqual(sections, ['topbar', 'mode-panel', 'hud', 'stage', 'controls'],
+    'the main screen should read title, mode, HUD, board, then controls');
+
   const rowIds = [...h.$('.action-row').children].map(b => b.id);
-  assert.deepEqual(rowIds, ['btn-undo', 'btn-hint', 'btn-more', 'btn-settings'],
-    'the action row holds the two play actions and the two sheet openers');
+  assert.deepEqual(rowIds, ['btn-undo', 'btn-hint', 'btn-restart', 'btn-settings'],
+    'the bottom row should expose the three board actions and settings');
 
-  // jsdom will happily click a button inside a hidden sheet, so asserting the
-  // click works proves nothing. Assert where the buttons actually live.
-  assert.equal(h.$('#more').contains(h.$('#btn-restart')), true, 'restart lives in the menu');
-  assert.equal(h.$('#more').contains(h.$('#btn-new')), true, 'new lives in the menu');
-  assert.equal(h.$('#more').hidden, true, 'the menu starts closed');
-
-  h.click('#btn-more');
-  await h.tick();
-  assert.equal(h.$('#more').hidden, false, 'the action row must be able to open the menu');
-
-  h.click('#btn-restart');
-  await h.tick();
-  assert.equal(h.$('#more').hidden, true, 'acting from the menu closes it');
+  assert.equal(h.$('.mode-row').contains(h.$('#btn-new')), true, 'New board sits beside the mode control');
+  assert.equal(h.$('.mode-panel').contains(h.$('.seg-mode')), true, 'mode is on the main screen');
+  assert.equal(h.$('#settings').contains(h.$('.seg-mode')), false, 'settings no longer owns mode');
+  assert.equal(h.$('#btn-more'), null, 'the board menu trigger is removed');
+  assert.equal(h.$('#more'), null, 'the board menu itself is removed');
 
   h.close();
 });
@@ -926,26 +922,20 @@ test('an untouched board is replaced without a pointless question', async () => 
   h.close();
 });
 
-test('the menu warns about losing a board before it is chosen, not after', async () => {
+test('New board warns about losing progress before it is chosen', async () => {
   const h = await fresh();
   const { neighbours } = h.bcp;
 
   // Nothing is at stake yet, so nothing should look alarming.
-  h.click('#btn-more');
-  await h.tick();
   assert.equal(h.$('#btn-new').classList.contains('btn-danger'), false,
     'an untouched board loses nothing, so do not cry wolf');
-  h.click('#btn-more-close');
-  await h.tick();
 
   h.bcp.slideTo([...neighbours(h.bcp.state.gap)][0], true);
   await h.tick();
   assert.equal(h.bcp.state.moves, 1);
 
-  h.click('#btn-more');
-  await h.tick();
   assert.equal(h.$('#btn-new').classList.contains('btn-danger'), true,
-    'once there is progress to lose, the menu must show which row costs it');
+    'once there is progress to lose, New board must show the cost before it is tapped');
 
   h.close();
 });
@@ -958,14 +948,9 @@ test('the daily is the same board all day and is shareable', async () => {
   await h.tick(2);
   const board = [...h.bcp.state.board];
 
-  // The reshuffle is not offered at all in daily play. It used to be a greyed
-  // row explained only by a title tooltip, which does not exist on touch.
-  h.click('#btn-more');
-  await h.tick();
+  // The reshuffle is not offered at all in daily play.
   assert.equal(h.$('#btn-new').hidden, true, 'daily must not offer a reshuffle');
-  assert.equal(h.$('#daily-note').hidden, false, 'and it must say why, on screen');
-  h.click('#btn-more-close');
-  await h.tick();
+  assert.match(h.$('#mode-note').textContent, /Daily/, 'the reserved mode note identifies the daily');
 
   h.bcp.newGame();
   await h.tick(2);

@@ -58,6 +58,11 @@ async function measure(page) {
     const app = document.querySelector('.app');
     const controls = document.querySelector('.controls');
     const guide = document.getElementById('guide');
+    const modePanel = document.querySelector('.mode-panel');
+    const modeNote = document.getElementById('mode-note');
+    const hud = document.querySelector('.hud');
+    const topbar = document.querySelector('.topbar');
+    const stage = document.querySelector('.stage');
 
     const wrapCs = getComputedStyle(wrap);
     const inset = parseFloat(wrapCs.paddingLeft) + parseFloat(wrapCs.paddingRight);
@@ -94,6 +99,11 @@ async function measure(page) {
       guide: rect(guide),
       app: rect(app),
       controls: rect(controls),
+      modePanel: rect(modePanel),
+      modeNote: rect(modeNote),
+      hud: rect(hud),
+      topbar: rect(topbar),
+      stage: rect(stage),
 
       slotCount: slots.length,
       tileCount: bcp.state.tiles.filter(Boolean).length,
@@ -305,6 +315,47 @@ test('portrait keeps the stacked layout', async () => {
 
   const m = await measure(page);
   assert.ok(m.controls.top >= m.board.bottom - SLACK, 'controls should sit below the board');
+
+  await context.close();
+});
+
+test('the mode row keeps a stable phone budget and the board caps on tablets', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  await page.goto(`${server.url}/index.html`);
+  await page.waitForFunction(() => Boolean(window.__bcp));
+  await settle(page);
+
+  const free = await measure(page);
+  const phoneWidthCell = Math.floor(
+    (free.wrapContentWidth - free.gutter * (free.cols - 1)) / free.cols
+  );
+  assert.equal(free.cell, phoneWidthCell, 'a tall phone should grow the board to its width budget');
+
+  await page.locator('.seg-mode [data-mode="daily"]').click();
+  await page.waitForFunction(() => window.__bcp.state.mode === 'daily');
+  await settle(page);
+  const daily = await measure(page);
+
+  await page.locator('.seg-mode [data-mode="levels"]').click();
+  await page.waitForFunction(() => window.__bcp.state.mode === 'levels');
+  await settle(page);
+  const levels = await measure(page);
+
+  assert.equal(daily.modeNote.height, free.modeNote.height, 'the note reserves its height in free play');
+  assert.equal(levels.modeNote.height, free.modeNote.height, 'the note height is stable in levels');
+  assert.equal(daily.stage.top, free.stage.top, 'daily should not move the board down');
+  assert.equal(levels.stage.top, free.stage.top, 'levels should not move the board down');
+  assert.equal(daily.cell, free.cell, 'same-sized free and daily boards share one stable budget');
+
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.locator('.seg-mode [data-mode="free"]').click();
+  await page.waitForFunction(() => window.__bcp.state.mode === 'free');
+  await settle(page);
+  const tablet = await measure(page);
+  assert.equal(tablet.cell, CELL_MAX, 'the board should stop growing at the tablet cap');
 
   await context.close();
 });
