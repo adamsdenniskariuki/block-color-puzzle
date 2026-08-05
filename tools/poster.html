@@ -1,0 +1,103 @@
+<!doctype html>
+<!-- Marketing poster for the Microsoft Store listing (2:3 poster art).
+     Not a screenshot - the Store uses this as the main logo image for games,
+     so it is composed rather than captured. Rendered by tools/make-store-assets.js. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #12161c;
+    --frame: #f3f5f7;
+    --frame-edge: #cbd2da;
+    --text: #eef2f6;
+    --text-dim: #93a1b1;
+    --red: #e53935;
+    --green: #00897b;
+    --blue: #1e88e5;
+    --purple: #8e24aa;
+    --amber: #fbc02d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 720px; height: 1080px; }
+  body {
+    background:
+      radial-gradient(120% 70% at 50% 18%, #1d2530 0%, var(--bg) 62%);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 56px;
+    padding: 72px 56px;
+  }
+
+  .board {
+    background: var(--frame);
+    border: 1px solid var(--frame-edge);
+    border-radius: 26px;
+    padding: 22px;
+    display: grid;
+    gap: 10px;
+    box-shadow: 0 30px 70px rgba(0, 0, 0, .55);
+  }
+  .guide, .row { display: grid; grid-template-columns: repeat(5, 92px); gap: 10px; }
+  .guide { padding-bottom: 16px; border-bottom: 2px dashed #cbd2da; margin-bottom: 6px; }
+  .guide i { height: 34px; border-radius: 8px; }
+  .row b { height: 92px; border-radius: 12px; display: block; }
+  .empty { background: #dcdfe3 !important; box-shadow: none !important; }
+
+  .red    { background: var(--red); }
+  .green  { background: var(--green); }
+  .blue   { background: var(--blue); }
+  .purple { background: var(--purple); }
+  .amber  { background: var(--amber); }
+
+  .wordmark { text-align: center; }
+  h1 {
+    font-size: 62px;
+    line-height: 1.05;
+    letter-spacing: -1.5px;
+    font-weight: 700;
+  }
+  p {
+    margin-top: 18px;
+    font-size: 27px;
+    color: var(--text-dim);
+    line-height: 1.45;
+  }
+</style>
+</head>
+<body>
+  <!-- A near-solved board: it shows the goal at a glance, which a scrambled
+       one does not. Each column matches its guide except the last two. -->
+  <div class="board">
+    <div class="guide">
+      <i class="red"></i><i class="green"></i><i class="blue"></i>
+      <i class="purple"></i><i class="amber"></i>
+    </div>
+    <div class="row">
+      <b class="red"></b><b class="green"></b><b class="blue"></b>
+      <b class="purple"></b><b class="amber"></b>
+    </div>
+    <div class="row">
+      <b class="red"></b><b class="green"></b><b class="blue"></b>
+      <b class="purple"></b><b class="amber"></b>
+    </div>
+    <div class="row">
+      <b class="red"></b><b class="green"></b><b class="blue"></b>
+      <b class="amber"></b><b class="purple"></b>
+    </div>
+    <div class="row">
+      <b class="red"></b><b class="green"></b><b class="blue"></b>
+      <b class="purple"></b><b class="empty"></b>
+    </div>
+  </div>
+
+  <div class="wordmark">
+    <h1>Block Color Puzzle</h1>
+    <p>Slide the blocks until every column<br>matches its guide colour.</p>
+  </div>
+</body>
+</html>
