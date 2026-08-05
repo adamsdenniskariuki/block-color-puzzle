@@ -706,6 +706,98 @@ test('a zero-move finish is not recorded, so it cannot skew the average', async 
   h.close();
 });
 
+// jsdom always reports the document as visible, so the state has to be forced
+// before the event means anything.
+function background(h) {
+  Object.defineProperty(h.doc, 'visibilityState', { value: 'hidden', configurable: true });
+  h.doc.dispatchEvent(new h.win.Event('visibilitychange'));
+}
+
+// Dealing a board is not playing it. Opening the app and closing it again used
+// to count a started puzzle and drag the finish rate down for free.
+test('a puzzle counts as started only once the first move lands', async () => {
+  const h = await fresh();
+  const { state, neighbours } = h.bcp;
+
+  assert.equal(h.bcp.loadStats().started, 0, 'dealing a board is not starting one');
+
+  h.bcp.slideTo([...neighbours(state.gap)][0], true);
+  await h.tick();
+  assert.equal(h.bcp.loadStats().started, 1, 'the first move starts the puzzle');
+
+  h.bcp.slideTo([...neighbours(state.gap)][0], true);
+  await h.tick();
+  assert.equal(h.bcp.loadStats().started, 1, 'later moves must not start it again');
+
+  h.close();
+});
+
+// The exit players actually use. Every other path banked; this one dropped the
+// board's moves and time on the floor.
+test('backgrounding the app banks the moves and time of the board in play', async () => {
+  const h = await fresh();
+  const { state, neighbours } = h.bcp;
+
+  h.bcp.slideTo([...neighbours(state.gap)][0], true);
+  await h.tick();
+  const played = state.moves;
+  assert.ok(played > 0);
+  assert.equal(h.bcp.loadStats().moves, 0, 'nothing is banked while the board is live');
+
+  background(h);
+  await h.tick();
+
+  assert.equal(h.bcp.loadStats().moves, played, 'the moves should have been banked');
+  h.close();
+});
+
+// Backgrounding banks mid-board, so the same board can be banked twice. It must
+// not be counted twice.
+test('a board banked on the way out is not counted again when it is solved', async () => {
+  const h = await fresh();
+  const { state, neighbours } = h.bcp;
+
+  h.bcp.slideTo([...neighbours(state.gap)][0], true);
+  await h.tick();
+
+  background(h);
+  await h.tick();
+  assert.equal(h.bcp.loadStats().moves, state.moves, 'banked once so far');
+
+  h.bcp.slideTo([...neighbours(state.gap)][0], true);
+  await h.tick();
+  const played = state.moves;
+
+  h.win.dispatchEvent(new h.win.Event('pagehide'));
+  await h.tick();
+
+  assert.equal(h.bcp.loadStats().moves, played,
+    'the lifetime total must equal what was played, not the sum of both flushes');
+
+  h.close();
+});
+
+// Time was only ever written in finish(), so a player who never solved anything
+// saw "Time played: 0" no matter how long they played.
+test('time played accrues on a board that is never solved', async () => {
+  const h = await fresh();
+  const { state, neighbours } = h.bcp;
+
+  h.bcp.slideTo([...neighbours(state.gap)][0], true);
+  await h.tick();
+  // The timer starts on the first move; give it something real to bank.
+  state.startedAt -= 5000;
+
+  h.win.dispatchEvent(new h.win.Event('pagehide'));
+  await h.tick();
+
+  const stats = h.bcp.loadStats();
+  assert.equal(stats.solved, 0, 'nothing was solved');
+  assert.ok(stats.ms >= 5000, `time played should have been banked, got ${stats.ms}`);
+
+  h.close();
+});
+
 /* ---------------- winning ---------------- */
 
 test('solving shows the win panel and records a best time', async () => {

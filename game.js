@@ -177,6 +177,9 @@
     startedAt: 0,
     elapsed: 0,
     timerId: null,
+    bankedMoves: 0,   // activity already written to lifetime stats for this board
+    bankedMs: 0,
+    counted: false,   // has this board been counted as "started" yet
     hintsLeft: HINTS_PER_GAME,
     hintCell: -1,     // cell the current hint points at, -1 when none
     solved: false
@@ -255,8 +258,11 @@
     if (!stats.firstAt) stats.firstAt = Date.now();
     const bucket = stats.byMode[mode] || (stats.byMode[mode] = {});
     for (const [k, v] of Object.entries(fields)) {
-      stats[k] = (stats[k] || 0) + v;
-      bucket[k] = (bucket[k] || 0) + v;
+      // Deltas can be negative - undo un-counts a move, and activity is banked
+      // mid-board whenever the app is backgrounded. A lifetime total must never
+      // dip below zero on the way back.
+      stats[k] = Math.max(0, (stats[k] || 0) + v);
+      bucket[k] = Math.max(0, (bucket[k] || 0) + v);
     }
     saveStats(stats);
   }
@@ -960,6 +966,12 @@
     if (record) {
       state.history.push(gapBefore);
       state.moves += moved;
+      // A puzzle counts as started on the first move, not when it is dealt.
+      // Opening the app and closing it again should not dent the finish rate.
+      if (!state.counted) {
+        state.counted = true;
+        bumpStats({ started: 1 }, state.mode);
+      }
       FX.sound.slide(moved);
       FX.haptics.slide(moved);
       startTimer();
@@ -1061,7 +1073,8 @@
     refreshTileState();
     // A board finished without a recorded move (test harness, or a scramble that
     // was already solved) would otherwise drag the lifetime average toward zero.
-    if (state.moves > 0) bumpStats({ solved: 1, moves: state.moves, ms: state.elapsed }, state.mode);
+    if (state.moves > 0) bumpStats({ solved: 1 }, state.mode);
+    flushActivity();
 
     el.winStats.textContent = `${formatTime(state.elapsed)}  \u00b7  ${state.moves} moves`;
 
@@ -1146,6 +1159,9 @@
     stopTimer();
     state.elapsed = 0;
     state.moves = 0;
+    state.bankedMoves = 0;
+    state.bankedMs = 0;
+    state.counted = false;
     state.history = [];
     state.solved = false;
     state.hintsLeft = HINTS_PER_GAME;
@@ -1184,15 +1200,27 @@
     renderGuide();
     renderBoard();
     updateHud();
-    bumpStats({ started: 1 }, state.mode);
   }
 
-  // Moves are banked when a board is solved. A board that is walked away from
-  // still cost the player effort, so flush it once here rather than writing to
-  // storage on every slide.
+  // Activity totals (moves, time) are flushed incrementally rather than once at
+  // the end, because a board can be banked more than once: backgrounding the app
+  // mid-game banks it, and solving the same board later must not count it twice.
+  // Deltas can be negative because undo un-counts a move; bumpStats clamps.
+  function flushActivity() {
+    const moves = state.moves - state.bankedMoves;
+    const ms = state.elapsed - state.bankedMs;
+    if (moves === 0 && ms === 0) return;
+    state.bankedMoves = state.moves;
+    state.bankedMs = state.elapsed;
+    bumpStats({ moves, ms }, state.mode);
+  }
+
+  // Kept as its own name because it reads at the call sites, and because a board
+  // walked away from is the case this exists for.
   function abandonBoard() {
-    if (state.solved || state.moves <= 0) return;
-    bumpStats({ moves: state.moves }, state.mode);
+    if (state.solved) return;
+    stopTimer();
+    flushActivity();
   }
 
   function restart() {
@@ -1201,6 +1229,9 @@
     stopTimer();
     state.elapsed = 0;
     state.moves = 0;
+    state.bankedMoves = 0;
+    state.bankedMs = 0;
+    state.counted = false;
     state.history = [];
     state.solved = false;
     state.hintsLeft = HINTS_PER_GAME;
@@ -1547,6 +1578,16 @@
 
   window.addEventListener('resize', () => { layout(); FX.confetti.resize(); });
 
+  // Closing or backgrounding the app is the exit path players use most, and it
+  // used to be the only one that dropped the board's moves and time on the floor.
+  // Safari and most mobile browsers can skip 'pagehide' entirely, so both events
+  // are wired; flushActivity banks a delta, so firing twice is harmless. This
+  // also stops the clock while the app is hidden, which is what a player expects.
+  window.addEventListener('pagehide', abandonBoard);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') abandonBoard();
+  });
+
   /* ---------------- swipe ---------------- */
 
   const SWIPE_MIN = 18;         // px before a drag counts as a swipe
@@ -1650,6 +1691,7 @@
       openLevelPicker, parFor, misplaced, setMode, newGame, restart, LEVEL_COUNT,
       showHint, solveFromHere, solverBoard, clearHint, slideTo, HINTS_PER_GAME,
       loadStats, saveStats, bumpStats, renderStats, statsRows, bestRows,
+      abandonBoard, flushActivity,
       formatLong, formatTime, totalStars,
       setPalette, setAppearance, palette, colourHex, PALETTES, APPEARANCES,
       PALETTE_ALIASES, APPEARANCE_ALIASES,

@@ -76,8 +76,12 @@ under a tenth of a second.
 The **📊** button in the topbar opens a lifetime record — puzzles solved, finish
 rate, total moves, time played, average solve, hints and undos, your daily
 streak, levels cleared and stars earned, plus your best run in each difficulty.
-Counters are written only at board boundaries (start, solve, walk-away) rather
-than on every slide, so playing stays cheap.
+Counters are written at board boundaries rather than on every slide, so playing
+stays cheap. A puzzle counts as *started* on your first move, not when it is
+dealt, and the effort you put into a board is banked whenever you leave it —
+including closing or backgrounding the app. Walking away therefore still adds to
+your moves, time, hints and undos; only the *solved* counters, and the finish
+rate and average built on them, need a completed board.
 
 The settings sheet carries two appearance controls:
 

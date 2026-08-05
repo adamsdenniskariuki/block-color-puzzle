@@ -64,17 +64,21 @@ Allow 30s–2min for the build.
 
 ```powershell
 npm install       # jsdom + playwright, dev-only
-npm run test:all  # 170 tests, about 30s
+npm run test:all  # 174 tests, about 15s
 ```
 
 | Command | Tests | Needs a browser |
 | --- | --- | --- |
 | `npm run test:unit` | 17 | no |
-| `npm run test:integration` | 50 | no |
+| `npm run test:integration` | 54 | no |
 | `npm run test:palette` | 4 | no |
-| `npm test` | 71 | no |
+| `npm test` | 75 | no |
 | `npm run test:layout` | 99 | yes, headless Chromium |
-| `npm run test:all` | 170 | yes |
+| `npm run test:all` | 174 | yes |
+
+`node --test` runs files in parallel but the tests *inside* a file serially. The two
+big suites each take about 13s, so `test:all` costs about what the slowest file costs.
+Splitting a file buys nothing until one of them dominates.
 
 Tests drive the **real shipped files** through a `window.__bcp` hook that `game.js`
 publishes only on `127.0.0.1`/`localhost`, so it never exists in production. There is no
@@ -112,6 +116,14 @@ duplicated copy of the logic to drift out of sync.
   to the gap, so "the cursor follows the block it just slid" passed even with the follow
   logic disabled — the block ends up *in* the old gap, which is where a dead cursor already
   was. It needed a second assertion at a position the default cannot produce.
+- **jsdom always reports `document.visibilityState` as `'visible'`.** Dispatching a bare
+  `visibilitychange` does nothing to a handler that guards on the state, so the test looks
+  like it exercised the exit path when it never entered the branch. Force it first:
+  `Object.defineProperty(h.doc, 'visibilityState', { value: 'hidden', configurable: true })`.
+- **A failing jsdom test hangs the runner after it reports.** The failure throws before
+  `h.close()`, so the window's timers keep the process alive and `node --test` prints its
+  summary and then sits there. Pass `--test-timeout=20000` when running a mutation, and be
+  ready to `stop_powershell`.
 
 ### Layout tests assert invariants, never pixels
 
@@ -265,6 +277,32 @@ consecutive frames match before recording. That is safe because a real bleed is 
   the movable state, which changes every move. Setting it in both places is how it rots.
 - **Assistive tech cannot see the gap at all** without `#board-status`. `role="application"`
   on the board means the app owns every announcement, so nothing is reported for free.
+
+## Stats traps
+
+- **The lifetime totals split into two kinds of counter.** *Activity* — moves, time, hints,
+  undos, started — is earned by playing and is banked whenever you leave a board. *Achievement*
+  — solved, finish rate, average, best — needs a completed board. Adding a counter means
+  deciding which half it belongs to; putting an activity counter behind `finish()` is the bug
+  this section exists to prevent.
+- **Activity is banked as a delta, never as a flag.** `flushActivity()` writes
+  `state.moves - state.bankedMoves` and then moves the marker. A one-shot "already banked"
+  boolean cannot work, because `visibilitychange` fires **every time** a mobile user switches
+  away and back, so the same board is flushed many times before it is solved.
+- **Move deltas can be negative.** `undo()` decrements `state.moves`, so a background-flush
+  followed by undos produces a negative delta. That is correct — it un-counts a move the game
+  itself no longer counts — so `bumpStats` clamps the *stored* total with `Math.max(0, …)`
+  rather than rejecting the delta.
+- **Both `pagehide` and `visibilitychange` are wired.** Safari and several mobile browsers skip
+  `pagehide`, and desktop tab-close does not always fire `visibilitychange`. Delta banking makes
+  the double-fire harmless, so wiring both is cheaper than working out which one you have.
+- **`abandonBoard()` must `stopTimer()` before it flushes.** `stopTimer` is what recomputes
+  `state.elapsed`; flushing first banks a stale figure. It also pauses the clock while the app is
+  hidden, which is what a player expects — `startTimer()` resumes correctly because it sets
+  `state.startedAt = Date.now() - state.elapsed`.
+- **"Started" counts on the first move, not on the deal.** Opening the app and closing it again
+  used to log a started puzzle and drag the finish rate down for free. The bump lives in
+  `slideTo()` behind `if (!state.counted)`.
 
 ## Keyboard cursor traps
 
