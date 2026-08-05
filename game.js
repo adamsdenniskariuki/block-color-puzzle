@@ -113,6 +113,7 @@
   const el = {
     guide:    document.getElementById('guide'),
     board:    document.getElementById('board'),
+    boardStatus: document.getElementById('board-status'),
     time:     document.getElementById('stat-time'),
     moves:    document.getElementById('stat-moves'),
     best:     document.getElementById('stat-best'),
@@ -187,6 +188,10 @@
 
   function colourHex(i) { return palette()[i].hex; }
   function colourName(i) { return palette()[i].name; }
+
+  // Screen readers get no spatial sense of the grid from a flat list of buttons,
+  // so every block and the gap itself carry their 1-based coordinates.
+  function positionLabel(i) { return `row ${rowOf(i) + 1}, column ${colOf(i) + 1}`; }
 
   function applyTheme() {
     const root = document.documentElement;
@@ -647,6 +652,7 @@
   function renderBoard() {
     el.board.innerHTML = '';
     state.tiles = new Array(cellCount()).fill(null);
+    announcedGap = -1;
 
     // Static backing slots so empty cells read as recesses in the frame.
     for (let i = 0; i < cellCount(); i++) {
@@ -668,7 +674,8 @@
       tile.dataset.index = String(i);
       tile.dataset.colour = String(colour);
       tile.textContent = el.symbols.checked ? SYMBOLS[colour] : '';
-      tile.setAttribute('aria-label', colourName(colour));
+      // aria-label is owned by refreshTileState, which runs at the end of this
+      // function - it needs the movable state, which changes every move.
       tile.addEventListener('click', () => {
         if (fromSwipe()) return;
         slideTo(Number(tile.dataset.index), true);
@@ -780,6 +787,10 @@
     });
   }
 
+  // Reset so the next refresh always re-announces, even if a new puzzle happens
+  // to drop the gap on the square it was already on.
+  let announcedGap = -1;
+
   function refreshTileState() {
     const showHints = el.hints.checked;
     const gapRow = rowOf(state.gap);
@@ -791,7 +802,15 @@
       tile.classList.toggle('is-movable', movable && !state.solved);
       const wrong = Number(tile.dataset.colour) !== state.guide[colOf(i)];
       tile.classList.toggle('is-wrong', showHints && wrong && !state.solved);
+
+      const label = `${colourName(Number(tile.dataset.colour))}, ${positionLabel(i)}`;
+      tile.setAttribute('aria-label', movable && !state.solved ? `${label}, movable` : label);
     });
+
+    if (announcedGap !== state.gap && el.boardStatus) {
+      announcedGap = state.gap;
+      el.boardStatus.textContent = `Empty slot ${positionLabel(state.gap)}.`;
+    }
 
     el.board.classList.toggle('is-solved', state.solved);
     el.undo.disabled = state.history.length === 0 || state.solved;

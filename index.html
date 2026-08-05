@@ -94,6 +94,10 @@
     </div>
   </main>
 
+  <!-- Sighted players see the gap; without this, assistive tech never learns
+       where it moved to. role="application" means the app owns announcements. -->
+  <p id="board-status" class="sr-only" role="status" aria-live="polite"></p>
+
   <section class="controls">
     <div class="action-row">
       <button id="btn-undo" class="btn" type="button">

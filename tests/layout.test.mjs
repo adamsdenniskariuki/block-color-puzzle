@@ -602,6 +602,78 @@ test('every theme is readable and none is a duplicate', async (t) => {
   await context.close();
 });
 
+// The empty slot is the one thing a player has to locate every single turn, and
+// it is a pure CSS artefact - a translucent fill plus inset shadows - so nothing
+// in jsdom or in the token values alone can tell you whether it is actually
+// visible. It shipped at 1.25:1 against the frame, i.e. very nearly invisible,
+// because the fill was measured but the *rendering* never was.
+//
+// WCAG 1.4.11 wants 3:1 for a graphical object you need in order to understand
+// the content. The boundary is what carries it here, so this samples the real
+// pixels and takes the darkest one: the fill on its own is only ~1.4:1 and it is
+// the rim and top shadow that do the work.
+test('the empty slot reads as a recess in every theme', async (t) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  await page.goto(`${server.url}/index.html`);
+  await page.waitForFunction(() => Boolean(window.__bcp));
+
+  const appearances = await page.evaluate(() => window.__bcp.APPEARANCES);
+
+  for (const [id, name] of Object.entries(appearances)) {
+    await t.test(name, async () => {
+      await page.evaluate((v) => window.__bcp.setAppearance(v), id);
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+
+      // Slots are appended in cell order, so the gap's index picks its slot.
+      const probe = await page.evaluate(() => {
+        const slot = document.querySelectorAll('#board .slot')[window.__bcp.state.gap];
+        const r = slot.getBoundingClientRect();
+        return {
+          rect: { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) },
+          frame: getComputedStyle(document.querySelector('.frame')).backgroundColor
+        };
+      });
+
+      assert.ok(probe.rect.width > 0 && probe.rect.height > 0, 'the empty slot should have a box');
+
+      // Playwright hands back a PNG; the page's own canvas is the only decoder
+      // available without adding a dependency.
+      const shot = await page.screenshot({ clip: probe.rect });
+      const pixels = await page.evaluate(async (b64) => {
+        const img = new Image();
+        img.src = `data:image/png;base64,${b64}`;
+        await img.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        return Array.from(ctx.getImageData(0, 0, img.width, img.height).data);
+      }, shot.toString('base64'));
+
+      let darkest = null;
+      let lowest = Infinity;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const rgb = [pixels[i], pixels[i + 1], pixels[i + 2]];
+        const l = luminance(rgb);
+        if (l < lowest) {
+          lowest = l;
+          darkest = rgb;
+        }
+      }
+
+      const edge = contrast(darkest, parseRgb(probe.frame));
+      assert.ok(edge >= 3,
+        `the empty slot's strongest edge is ${edge.toFixed(2)}:1 against the frame, needs 3:1 to be findable`);
+    });
+  }
+
+  await context.close();
+});
+
 // Each swatch in the picker carries data-appearance and paints itself in the
 // theme it offers, so a theme is rendered *inside* whichever theme is currently
 // active. Any token a theme block leaves undefined therefore leaks in from the

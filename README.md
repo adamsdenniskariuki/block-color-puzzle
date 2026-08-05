@@ -116,7 +116,7 @@ out of the way.
 | Mode | ⚙ — Free play (endless random boards), Daily (one shared puzzle a day), or Levels (24-puzzle campaign) |
 | Difficulty | ⚙ — Easy (4 rows) / Normal (5) / Hard (6) — free play only |
 | Colours | ⚙ — Classic / Accessible / Candy / Jewel |
-| Appearance | ⚙ — Dark / Midnight / Slate |
+| Appearance | ⚙ — Dark / Midnight / Slate / Forest / Plum / Amber / Light / Paper |
 | Colour hints | ⚙ toggle — dims every block that is in the wrong column |
 | Symbols | ⚙ toggle — adds a shape to each colour for colourblind play |
 | Sound | ⚙ toggle — synthesised slide/bump/win tones, no audio files |
@@ -124,6 +124,15 @@ out of the way.
 
 Solving the board fires a confetti burst. Everything respects
 `prefers-reduced-motion`, which skips the confetti entirely.
+
+The empty slot is the one piece of state you need every turn, so it is drawn as a
+recess — a dark inner top edge and rim, the inverse of the raised lip on the blocks —
+and held above 3:1 against the frame in every theme by a test that samples the
+rendered pixels. It carries no "Empty" label: the gap is the only cell without a
+block, so the word would name an absence and add nothing. For assistive tech, where
+the gap genuinely is invisible, every block announces its colour, its row and column,
+and whether it can currently move, and a live region reports where the empty slot
+lands after each move.
 
 Best time is tracked per difficulty in `localStorage`, alongside your daily
 streak and the last 60 daily results.

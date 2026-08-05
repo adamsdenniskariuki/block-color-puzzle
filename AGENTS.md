@@ -234,6 +234,26 @@ passed on every isolated re-run. If it fails alone, believe it. If it fails only
   `loadPrefs` validates against `PALETTES` and silently drops the player back to
   `classic`. Add a `PALETTE_ALIASES` entry, same as `APPEARANCE_ALIASES`.
 
+## Board traps
+
+- **The empty slot is game state, not decoration.** It is the one thing a player has to
+  find every turn, and it is a pure CSS artefact — a translucent fill plus inset shadows,
+  with no element of its own (`renderBoard` skips the gap, so there is nothing to label).
+  It shipped at **1.25:1** against the frame, i.e. very nearly invisible, because the
+  token value was reviewed but the rendering never was.
+- **Test the rendered pixels, not the token.** The fill on its own is only ~1.4:1; the rim
+  and top shadow carry the 3:1 that WCAG 1.4.11 wants. `tests/layout.test.mjs` screenshots
+  the gap, decodes it through the page's own canvas (no dependency), and takes the darkest
+  pixel. A fill-based assertion would have passed the broken version.
+- **Raised and recessed are opposite shadows.** Tiles read as raised via a dark lip at the
+  *bottom* (`inset 0 -3px 0`); the slot reads as a hole via a dark edge at the *top*.
+  Adding a light bottom highlight to the slot flips it straight back to looking like a
+  block — it was tried and rejected.
+- **`aria-label` on a tile is owned by `refreshTileState`, not `renderBoard`.** It carries
+  the movable state, which changes every move. Setting it in both places is how it rots.
+- **Assistive tech cannot see the gap at all** without `#board-status`. `role="application"`
+  on the board means the app owns every announcement, so nothing is reported for free.
+
 ## SVG icon traps
 
 The action row and the board menu use an inline `<symbol>` sprite at the top of
@@ -262,6 +282,23 @@ There is a test guarding this.
 - Multi-line `.Replace()` on file content is unreliable. Use a proper editor tool for
   precise CSS mutations rather than string surgery.
 - `&&` only chains native commands. Use `;` before PowerShell keywords.
+- **Double quotes interpolate `${...}`.** Passing a JS template-literal fragment such as
+  `", ${positionLabel(i)}"` as a double-quoted argument silently expands to `", "`, so a
+  mutation test edits the wrong text and appears to pass. Use single quotes for anything
+  containing `$`, and make the mutation script fail loudly when the token is not found.
+
+## Mutation testing
+
+Every new test in this repo has to be proven to fail when the behaviour is broken; six
+vacuous ones have been found here already.
+
+- **Never restore with `git checkout -- <file>` while the feature is uncommitted** — it
+  reverts the work along with the mutation. Copy the file to `$env:TEMP` first and restore
+  from that.
+- **Assert the mutation applied** before trusting the result. A here-string written as LF
+  will not match a CRLF file, and a swallowed `$` will not match either; both look like a
+  passing test on unmutated code.
+- Prefer newline-free single-line token swaps over multi-line replacements.
 
 ## Where things live
 

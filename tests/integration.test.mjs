@@ -459,6 +459,79 @@ test('every palette and appearance is offered as a control', async () => {
   h.close();
 });
 
+/* ---------------- accessibility ---------------- */
+
+// A colour name on its own gives a screen reader no way to build a picture of
+// the grid: you hear twenty-four colours in a row with nothing to place them
+// against, and no clue which ones you could actually move.
+test('every block announces its colour and its position', async () => {
+  const h = await fresh();
+  const { state, COLS } = h.bcp;
+
+  const tiles = h.$$('#board .tile');
+  assert.equal(tiles.length, state.rows * COLS - 1);
+
+  for (const tile of tiles) {
+    const i = Number(tile.dataset.index);
+    const label = tile.getAttribute('aria-label');
+    const row = Math.floor(i / COLS) + 1;
+    const col = (i % COLS) + 1;
+
+    assert.ok(label, `the block at index ${i} has no label at all`);
+    assert.ok(label.includes(`row ${row}, column ${col}`),
+      `"${label}" should place the block at row ${row}, column ${col}`);
+    assert.ok(label.startsWith(h.bcp.palette()[Number(tile.dataset.colour)].name),
+      `"${label}" should lead with the colour name`);
+  }
+
+  h.close();
+});
+
+// Whether a block can move is shown visually by a hover ring, which is no use
+// to anyone who cannot see it - and it changes every single move.
+test('only the blocks in line with the gap are announced as movable', async () => {
+  const h = await fresh();
+  const { state, COLS } = h.bcp;
+  const gapRow = Math.floor(state.gap / COLS);
+  const gapCol = state.gap % COLS;
+
+  for (const tile of h.$$('#board .tile')) {
+    const i = Number(tile.dataset.index);
+    const inLine = Math.floor(i / COLS) === gapRow || i % COLS === gapCol;
+    const label = tile.getAttribute('aria-label');
+    assert.equal(label.endsWith(', movable'), inLine,
+      `"${label}" ${inLine ? 'should' : 'should not'} be announced as movable`);
+  }
+
+  h.close();
+});
+
+// The gap has no element of its own - it is a hole where a button is not - so
+// without a live region it is the one piece of state assistive tech can never
+// reach, on a board whose entire mechanic is "slide into the hole".
+test('the empty slot is announced, and again wherever it moves to', async () => {
+  const h = await fresh();
+  const { state, COLS } = h.bcp;
+  const status = h.$('#board-status');
+
+  assert.ok(status, 'there should be a live region for board state');
+  assert.equal(status.getAttribute('aria-live'), 'polite');
+
+  const said = (i) => `Empty slot row ${Math.floor(i / COLS) + 1}, column ${(i % COLS) + 1}.`;
+  assert.equal(status.textContent, said(state.gap), 'the starting position should be announced');
+
+  // Slide the block directly left of the gap into it, so the gap moves.
+  const before = state.gap;
+  const neighbour = before % COLS === 0 ? before + 1 : before - 1;
+  h.bcp.slideTo(neighbour, true);
+  await h.tick();
+
+  assert.equal(state.gap, neighbour, 'the move should have happened');
+  assert.equal(status.textContent, said(neighbour), 'the new position should be announced');
+
+  h.close();
+});
+
 /* ---------------- stats ---------------- */
 
 test('the stats screen fills every card from storage', async () => {
