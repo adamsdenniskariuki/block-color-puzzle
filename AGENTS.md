@@ -156,6 +156,34 @@ passed on every isolated re-run. If it fails alone, believe it. If it fails only
   iPhone SE sits between the two; at 600px it fell back to the stacked layout and
   overflowed the viewport by 67px at six rows.
 
+## Theme traps
+
+- **Theme rules are bare attribute selectors (`[data-appearance="forest"]`), not
+  `:root[data-appearance=...]`.** That is deliberate: putting `data-appearance` on *any*
+  element re-scopes those variables to it and its descendants, which is how each swatch in
+  the settings picker paints itself in the theme it offers while the card around it stays
+  in the current theme. Do not "tidy" these into `:root[...]` — it silently breaks the
+  previews.
+- **`dark` needs its own `[data-appearance="dark"]` block even though `:root` already
+  holds that palette.** `:root` is the same element the active theme sits on, so a nested
+  dark preview would inherit the *current* theme and preview the wrong thing. `:root`
+  keeps the palette so the first paint is right before JS runs; the duplicate block makes
+  the preview right. Both are load-bearing.
+- **Any new colour must be a token, not a literal.** Four literals are deliberate
+  exceptions — the white tile outline, the tile label `rgba(255,255,255,0.92)`, the
+  win-banner green and the star gold. All four sit on saturated tiles or coloured banners
+  and are theme-independent. Everything else must go through a variable or it will break
+  on `light` and `paper`.
+- **White-alpha washes invert.** `rgba(255,255,255,0.06)` is invisible on a light theme.
+  Use `var(--wash)`, which flips to black-alpha in `light` and `paper`.
+- **Themes are separated by hue, not brightness.** The original three were one blue-grey
+  at three lightnesses and users read them as a single theme with a dimmer switch. A new
+  theme that only changes lightness is not a new theme.
+- **jsdom cannot resolve custom properties**, so theme coverage lives in
+  `tests/layout.test.mjs` (real Chromium). It asserts every appearance applies, has a
+  unique background, and clears 4.5:1 for both body text and text-on-accent. A typo'd
+  selector shows up as a duplicate background.
+
 ## SVG icon traps
 
 The action row and the board menu use an inline `<symbol>` sprite at the top of

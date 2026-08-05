@@ -65,7 +65,12 @@
   const APPEARANCES = {
     dark:     'Dark',
     midnight: 'Midnight',
-    slate:    'Slate'
+    slate:    'Slate',
+    forest:   'Forest',
+    plum:     'Plum',
+    amber:    'Amber',
+    light:    'Light',
+    paper:    'Paper'
   };
 
   const COLS = 5;                   // one column per colour
@@ -1130,14 +1135,33 @@
     FX.sound.click();
   }
 
+  // Names like "Dark" and "Midnight" tell you nothing about what you are
+  // choosing, so each theme previews itself: page, surface and accent, drawn
+  // with that theme's own variables rather than a duplicated colour list.
   function buildAppearancePicker() {
     el.appearance.innerHTML = '';
     for (const [id, name] of Object.entries(APPEARANCES)) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'seg-btn' + (id === state.appearance ? ' is-active' : '');
+      btn.className = 'swatch' + (id === state.appearance ? ' is-active' : '');
       btn.dataset.appearance = id;
-      btn.textContent = name;
+      btn.setAttribute('aria-pressed', String(id === state.appearance));
+      btn.title = name;
+
+      const preview = document.createElement('span');
+      preview.className = 'theme-preview';
+      preview.dataset.appearance = id;
+      const surface = document.createElement('span');
+      surface.className = 'theme-surface';
+      const dot = document.createElement('span');
+      dot.className = 'theme-dot';
+      preview.append(surface, dot);
+
+      const label = document.createElement('span');
+      label.className = 'swatch-name';
+      label.textContent = name;
+
+      btn.append(preview, label);
       btn.addEventListener('click', () => setAppearance(id));
       el.appearance.appendChild(btn);
     }
@@ -1159,7 +1183,9 @@
       btn.setAttribute('aria-pressed', String(on));
     }
     for (const btn of el.appearance.children) {
-      btn.classList.toggle('is-active', btn.dataset.appearance === state.appearance);
+      const on = btn.dataset.appearance === state.appearance;
+      btn.classList.toggle('is-active', on);
+      btn.setAttribute('aria-pressed', String(on));
     }
   }
 

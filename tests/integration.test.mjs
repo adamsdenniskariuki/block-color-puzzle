@@ -402,7 +402,7 @@ test('every palette and appearance is offered as a control', async () => {
   const h = await fresh();
 
   assert.equal(h.$$('#palette-row .swatch').length, Object.keys(h.bcp.PALETTES).length);
-  assert.equal(h.$$('#appearance-row .seg-btn').length, Object.keys(h.bcp.APPEARANCES).length);
+  assert.equal(h.$$('#appearance-row .swatch').length, Object.keys(h.bcp.APPEARANCES).length);
 
   h.close();
 });

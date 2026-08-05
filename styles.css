@@ -1,13 +1,23 @@
 :root {
   --bg: #12161c;
   --bg-soft: #1b212a;
+  --surface-hi: #26303e;
   --frame: #f3f5f7;
   --frame-edge: #cbd2da;
   --text: #eef2f6;
+  --text-body: #c6d0dc;
   --text-dim: #93a1b1;
   --accent: #4da3ff;
+  --accent-soft: #223449;
+  --on-accent: #08121d;
   --line: #262e39;
   --line-strong: #333d4a;
+  --line-bright: #4a5768;
+  --danger: #ffb3b8;
+  --danger-line: #7c3b41;
+  --gold: #ffd35c;
+  --board-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --wash: rgba(255, 255, 255, 0.06);
   --radius: 14px;
   --gutter: 6px;
   --cell: 56px;
@@ -15,23 +25,154 @@
 }
 
 /* Appearance only moves the surfaces around the board. The board frame stays
-   light in every theme because the tile colours are tuned against it. */
+   light in every dark theme because the tile colours are tuned against it;
+   Light is the one theme that has to restate it, since a near-white frame on a
+   near-white page would stop reading as a separate surface.
+
+   The three original themes were all the same blue-grey at different
+   brightnesses, so they read as one theme with a dimmer switch. Each of these
+   moves the hue, not just the lightness. */
+
+/* :root carries the dark palette so the first paint is correct before JS runs.
+   It is repeated here because each preview swatch re-scopes these variables on
+   itself to show the theme it offers - without an explicit rule, the Dark
+   swatch would inherit whatever theme is currently applied and preview it. */
+[data-appearance="dark"] {
+  --bg: #12161c;
+  --bg-soft: #1b212a;
+  --surface-hi: #26303e;
+  --frame: #f3f5f7;
+  --frame-edge: #cbd2da;
+  --text: #eef2f6;
+  --text-body: #c6d0dc;
+  --text-dim: #93a1b1;
+  --accent: #4da3ff;
+  --accent-soft: #223449;
+  --on-accent: #08121d;
+  --line: #262e39;
+  --line-strong: #333d4a;
+  --line-bright: #4a5768;
+  --wash: rgba(255, 255, 255, 0.06);
+}
+
 [data-appearance="midnight"] {
-  --bg: #05070a;
-  --bg-soft: #10151c;
-  --text: #f2f6fa;
-  --text-dim: #8697a8;
-  --line: #1a222c;
-  --line-strong: #27313d;
+  --bg: #000000;
+  --bg-soft: #0c0c0e;
+  --surface-hi: #17171b;
+  --text: #f5f5f7;
+  --text-body: #c9c9cf;
+  --text-dim: #8a8a93;
+  --accent: #7fb8ff;
+  --accent-soft: #16243a;
+  --on-accent: #05080d;
+  --line: #1c1c21;
+  --line-strong: #2a2a31;
+  --line-bright: #3d3d46;
+  --board-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
 }
 
 [data-appearance="slate"] {
   --bg: #222831;
   --bg-soft: #2d3540;
+  --surface-hi: #3a4450;
   --text: #f4f7fa;
+  --text-body: #cdd7e1;
   --text-dim: #a8b6c4;
+  --accent-soft: #2c4257;
   --line: #3a4552;
   --line-strong: #4a5665;
+  --line-bright: #5e6b7b;
+}
+
+[data-appearance="forest"] {
+  --bg: #0d1a13;
+  --bg-soft: #15271c;
+  --surface-hi: #1e3527;
+  --text: #eef7f1;
+  --text-body: #c2d8ca;
+  --text-dim: #8fab99;
+  --accent: #4fd18b;
+  --accent-soft: #17392a;
+  --on-accent: #05130c;
+  --line: #1d3325;
+  --line-strong: #2a4633;
+  --line-bright: #3a5c44;
+}
+
+[data-appearance="plum"] {
+  --bg: #170f1f;
+  --bg-soft: #22182e;
+  --surface-hi: #2e2140;
+  --text: #f5eefa;
+  --text-body: #d3c5e0;
+  --text-dim: #a695b5;
+  --accent: #c98bfc;
+  --accent-soft: #33204a;
+  --on-accent: #12061b;
+  --line: #2b1e3a;
+  --line-strong: #3b2a4f;
+  --line-bright: #4e3a66;
+}
+
+[data-appearance="amber"] {
+  --bg: #1b1611;
+  --bg-soft: #271f18;
+  --surface-hi: #342a20;
+  --text: #faf3ea;
+  --text-body: #ddccb8;
+  --text-dim: #b3a08a;
+  --accent: #f0a860;
+  --accent-soft: #40301d;
+  --on-accent: #1a0f03;
+  --line: #33291f;
+  --line-strong: #45382a;
+  --line-bright: #5c4b38;
+}
+
+[data-appearance="light"] {
+  --bg: #e8ecf1;
+  --bg-soft: #ffffff;
+  --surface-hi: #f1f4f8;
+  --frame: #ffffff;
+  --frame-edge: #b9c2cd;
+  --text: #131822;
+  --text-body: #39434f;
+  --text-dim: #5d6b7c;
+  --accent: #1f6feb;
+  --accent-soft: #dbe8fd;
+  --on-accent: #ffffff;
+  --line: #d3dae2;
+  --line-strong: #bcc5d0;
+  --line-bright: #9aa6b4;
+  --danger: #b3261e;
+  --danger-line: #e3a9a5;
+  --gold: #9a6b00;
+  --board-shadow: 0 8px 24px rgba(15, 26, 41, 0.14);
+  --wash: rgba(0, 0, 0, 0.06);
+  --slot: rgba(0, 0, 0, 0.10);
+}
+
+[data-appearance="paper"] {
+  --bg: #efe7d9;
+  --bg-soft: #fdf9f1;
+  --surface-hi: #f5eee1;
+  --frame: #fffdf8;
+  --frame-edge: #cbbfa8;
+  --text: #241d12;
+  --text-body: #4a3f2e;
+  --text-dim: #7a6c55;
+  --accent: #96601a;
+  --accent-soft: #f6e6c9;
+  --on-accent: #fffaf0;
+  --line: #ded2bb;
+  --line-strong: #c8baa0;
+  --line-bright: #a2947b;
+  --danger: #9c2b21;
+  --danger-line: #d8a89f;
+  --gold: #8a6100;
+  --board-shadow: 0 8px 24px rgba(60, 45, 20, 0.16);
+  --wash: rgba(0, 0, 0, 0.06);
+  --slot: rgba(0, 0, 0, 0.10);
 }
 
 * { box-sizing: border-box; }
@@ -133,7 +274,7 @@ body {
   border: 1px solid var(--frame-edge);
   border-radius: var(--radius);
   padding: 10px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--board-shadow);
 }
 
 .guide {
@@ -267,14 +408,14 @@ body {
 
 .win-card h2 { margin: 0 0 6px; font-size: 26px; }
 .win-stats { margin: 0 0 4px; color: var(--text-dim); font-size: 14px; }
-.win-best { margin: 0 0 4px; color: #ffd35c; font-size: 13px; font-weight: 600; }
+.win-best { margin: 0 0 4px; color: var(--gold); font-size: 13px; font-weight: 600; }
 .win-streak { margin: 0 0 4px; color: var(--text-dim); font-size: 13px; }
 .win-actions { display: flex; gap: 8px; margin-top: 12px; }
 .win-actions .btn { flex: 1; }
 
 .win-stars { margin: 0 0 4px; font-size: 20px; letter-spacing: 4px; }
 .win-stars .earned { color: #fbc02d; }
-.win-stars .missed { color: #3c4859; }
+.win-stars .missed { color: var(--line-bright); }
 
 .daily-note,
 .mode-note {
@@ -313,7 +454,7 @@ body {
   cursor: pointer;
 }
 
-.seg-btn.is-active { background: var(--accent); color: #08121d; }
+.seg-btn.is-active { background: var(--accent); color: var(--on-accent); }
 .seg-btn:disabled { opacity: .38; cursor: default; }
 
 /* Icons are stroked, not filled, and follow the button's own colour - including
@@ -365,7 +506,7 @@ body {
   cursor: pointer;
 }
 
-.btn:hover { border-color: #4a5768; }
+.btn:hover { border-color: var(--line-bright); }
 .btn:disabled { opacity: 0.4; cursor: default; }
 
 /* A trailing bare number reads as "hint #3"; a pill reads as a quantity. */
@@ -378,7 +519,7 @@ body {
   padding: 0 4px;
   border-radius: 8px;
   background: var(--accent);
-  color: #08121d;
+  color: var(--on-accent);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
@@ -386,16 +527,16 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #08121d; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
 /* The one action that destroys progress should not look like the safe ones. */
-.btn.btn-danger { border-color: #7c3b41; color: #ffb3b8; }
-.btn.btn-danger:hover { border-color: #a04c54; }
+.btn.btn-danger { border-color: var(--danger-line); color: var(--danger); }
+.btn.btn-danger:hover { border-color: var(--danger); }
 
 /* Cancel is not the point of the sheet, so it must not out-shout the actions
    it sits under. Quiet, borderless, centred - present but never the target. */
 .btn.btn-quiet { background: none; border-color: transparent; color: var(--text-dim); }
-.btn.btn-quiet:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+.btn.btn-quiet:hover { background: var(--wash); color: var(--text); }
 
 /* Stacked buttons in a sheet; .modal-card .btn already spans the full width.
    Menu rows lead with their icon, so the labels align down the left edge. */
@@ -428,7 +569,7 @@ body {
   gap: 9px;
   min-height: 44px;
   padding: 0 12px;
-  border: 1px solid #2a3340;
+  border: 1px solid var(--line);
   border-radius: 11px;
   background: var(--bg-soft);
   font-size: 13px;
@@ -438,7 +579,7 @@ body {
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.toggle:hover { border-color: #3c4859; }
+.toggle:hover { border-color: var(--line-strong); }
 
 /* The native control stays focusable but invisible; .switch is the visual. */
 .toggle input {
@@ -456,8 +597,8 @@ body {
   width: 34px;
   height: 20px;
   border-radius: 999px;
-  background: #2f3947;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  background: var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--wash);
   transition: background 0.18s ease;
 }
 
@@ -469,7 +610,7 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #97a4b4;
+  background: var(--text-dim);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   transition: transform 0.18s ease, background 0.18s ease;
 }
@@ -477,7 +618,7 @@ body {
 .toggle-text { line-height: 1.2; }
 
 .toggle input:checked + .switch { background: var(--accent); }
-.toggle input:checked + .switch::after { transform: translateX(14px); background: #f7fbff; }
+.toggle input:checked + .switch::after { transform: translateX(14px); background: var(--text); }
 
 .toggle:has(input:checked) { border-color: rgba(77, 163, 255, 0.5); color: var(--text); }
 
@@ -508,19 +649,19 @@ body {
   max-height: calc(100dvh - 36px);
   overflow-y: auto;
   background: var(--bg-soft);
-  border: 1px solid #2c3542;
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 20px 22px;
 }
 
 .modal-card h2 { margin: 0 0 12px; font-size: 20px; }
 .modal-card ul { margin: 0 0 18px; padding-left: 20px; }
-.modal-card li { margin-bottom: 8px; font-size: 14px; line-height: 1.5; color: #c6d0dc; }
+.modal-card li { margin-bottom: 8px; font-size: 14px; line-height: 1.5; color: var(--text-body); }
 .modal-card .btn { width: 100%; }
 
 /* Collapsed reference sections keep the help modal short on open. */
 .help-more {
-  border-top: 1px solid #2c3542;
+  border-top: 1px solid var(--line);
 }
 
 .help-more > summary {
@@ -573,7 +714,7 @@ body {
   margin: 0 -22px;
   padding: 14px 22px 20px;
   background: var(--bg-soft);
-  border-top: 1px solid #2c3542;
+  border-top: 1px solid var(--line);
 }
 
 /* ---------- settings sheet ---------- */
@@ -625,23 +766,23 @@ body {
   gap: 2px;
   min-height: 58px;
   padding: 6px 2px;
-  border: 1px solid #2c3542;
+  border: 1px solid var(--line);
   border-radius: 10px;
-  background: #202834;
+  background: var(--bg-soft);
   color: var(--text);
   font: inherit;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.level-btn:hover:not(:disabled) { border-color: #46536580; background: #26303e; }
+.level-btn:hover:not(:disabled) { border-color: var(--line-bright); background: var(--surface-hi); }
 
 .level-num { font-size: 16px; font-weight: 600; line-height: 1; }
 
 .level-stars { font-size: 10px; letter-spacing: 1px; color: #fbc02d; min-height: 12px; }
-.level-stars .missed { color: #3c4859; }
+.level-stars .missed { color: var(--line-bright); }
 
-.level-btn.is-current { border-color: var(--accent); background: #223449; }
+.level-btn.is-current { border-color: var(--accent); background: var(--accent-soft); }
 
 .level-btn:disabled {
   opacity: 0.45;
@@ -709,6 +850,39 @@ body {
 .swatch-name {
   font-size: 12px;
   font-weight: 600;
+}
+
+/* Each preview re-scopes the theme variables onto itself, so it paints in the
+   theme it is offering while the card around it stays in the current one. */
+.theme-preview {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 32px;
+  border-radius: 7px;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  overflow: hidden;
+}
+
+.theme-surface {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 6px;
+  height: 9px;
+  border-radius: 3px;
+  background: var(--bg-soft);
+}
+
+.theme-dot {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  width: 14px;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--accent);
 }
 
 /* ---------- stats ---------- */

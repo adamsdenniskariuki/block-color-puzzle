@@ -518,3 +518,86 @@ test('resizing converges instead of oscillating', async () => {
 
   await context.close();
 });
+
+/* ---------------- themes ---------------- */
+
+// sRGB relative luminance, per WCAG 2.1.
+function luminance(rgb) {
+  const [r, g, b] = rgb.map((c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a, b) {
+  const la = luminance(a);
+  const lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+function parseRgb(css) {
+  const nums = css.match(/[\d.]+/g).slice(0, 3).map(Number);
+  assert.equal(nums.length, 3, `could not parse a colour from "${css}"`);
+  return nums;
+}
+
+// Themes are pure CSS custom properties, so jsdom cannot resolve them - this
+// has to run somewhere with a cascade. Two of the themes are light, which is
+// where readability is easiest to break, so the contrast floor matters more
+// than any of the individual colour choices.
+test('every theme is readable and none is a duplicate', async (t) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  await page.goto(`${server.url}/index.html`);
+  await page.waitForFunction(() => Boolean(window.__bcp));
+
+  const themes = await page.evaluate(() => {
+    // Probe the accent pair the same way the UI uses it: a filled control.
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;left:-999px;background:var(--accent);color:var(--on-accent)';
+    document.body.appendChild(probe);
+
+    const out = {};
+    for (const [id, name] of Object.entries(window.__bcp.APPEARANCES)) {
+      window.__bcp.setAppearance(id);
+      const body = getComputedStyle(document.body);
+      const chip = getComputedStyle(probe);
+      out[id] = {
+        name,
+        applied: document.documentElement.dataset.appearance,
+        bg: body.backgroundColor,
+        text: body.color,
+        accent: chip.backgroundColor,
+        onAccent: chip.color
+      };
+    }
+    probe.remove();
+    return out;
+  });
+
+  const seen = new Map();
+
+  for (const [id, theme] of Object.entries(themes)) {
+    await t.test(theme.name, () => {
+      assert.equal(theme.applied, id, 'choosing a theme must apply it to the document');
+
+      // A typo in a selector leaves the theme silently falling back to the
+      // default, which looks like a working button that does nothing.
+      const previous = seen.get(theme.bg);
+      assert.equal(previous, undefined,
+        `${theme.name} has the same background as ${previous} - one of them is not being applied`);
+      seen.set(theme.bg, theme.name);
+
+      const body = contrast(parseRgb(theme.text), parseRgb(theme.bg));
+      assert.ok(body >= 4.5, `body text is ${body.toFixed(2)}:1 against the page, needs 4.5:1`);
+
+      const onAccent = contrast(parseRgb(theme.onAccent), parseRgb(theme.accent));
+      assert.ok(onAccent >= 4.5, `text on the accent is ${onAccent.toFixed(2)}:1, needs 4.5:1`);
+    });
+  }
+
+  await context.close();
+});
