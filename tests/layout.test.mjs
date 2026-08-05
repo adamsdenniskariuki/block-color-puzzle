@@ -430,7 +430,18 @@ test('help content never shows through the dismiss button', async () => {
       }
     }, fraction);
     await settle(page);
-    shots.push(await page.screenshot({ clip: band }));
+    // Under parallel test load the compositor can still be a frame behind, which
+    // made this test flaky. Wait for the band to stop changing before recording.
+    // A real bleed is a steady-state difference between scroll positions, so
+    // settling here does not weaken the assertion below.
+    let shot = await page.screenshot({ clip: band });
+    for (let i = 0; i < 10; i += 1) {
+      await settle(page);
+      const next = await page.screenshot({ clip: band });
+      if (next.equals(shot)) break;
+      shot = next;
+    }
+    shots.push(shot);
   }
 
   for (let i = 1; i < shots.length; i += 1) {

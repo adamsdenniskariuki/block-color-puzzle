@@ -64,16 +64,17 @@ Allow 30s–2min for the build.
 
 ```powershell
 npm install       # jsdom + playwright, dev-only
-npm run test:all  # 111 tests, about 11s
+npm run test:all  # 170 tests, about 30s
 ```
 
 | Command | Tests | Needs a browser |
 | --- | --- | --- |
 | `npm run test:unit` | 17 | no |
-| `npm run test:integration` | 34 | no |
-| `npm test` | 51 | no |
-| `npm run test:layout` | 60 | yes, headless Chromium |
-| `npm run test:all` | 111 | yes |
+| `npm run test:integration` | 50 | no |
+| `npm run test:palette` | 4 | no |
+| `npm test` | 71 | no |
+| `npm run test:layout` | 99 | yes, headless Chromium |
+| `npm run test:all` | 170 | yes |
 
 Tests drive the **real shipped files** through a `window.__bcp` hook that `game.js`
 publishes only on `127.0.0.1`/`localhost`, so it never exists in production. There is no
@@ -107,6 +108,10 @@ duplicated copy of the logic to drift out of sync.
 - **`state.seed` does not exist.** Free play uses `Math.random`; daily and levels build
   an RNG from `mulberry32(seedFrom(...))` and keep no seed. Asserting on it compares
   `undefined` to `undefined` and always passes. Compare `state.board` instead.
+- **An assertion whose expected value equals the default is vacuous.** The cursor defaults
+  to the gap, so "the cursor follows the block it just slid" passed even with the follow
+  logic disabled — the block ends up *in* the old gap, which is where a dead cursor already
+  was. It needed a second assertion at a position the default cannot produce.
 
 ### Layout tests assert invariants, never pixels
 
@@ -131,12 +136,19 @@ assertions **both passed on the broken CSS**:
 
 The symptom was visual, so the assertion had to be visual: screenshot the footer band at
 three scroll positions and require the PNG buffers to be byte-identical. No image
-decoding, no extra dependency. Reintroducing the bug turns it red.
+decoding, no extra dependency.
 
-Because it compares raw pixels, this is the one test sensitive to machine load — it has
-gone red once under a concurrent `npx` call and once during a full parallel run, then
-passed on every isolated re-run. If it fails alone, believe it. If it fails only inside
-`test:all`, re-run `npm run test:layout` before touching any CSS.
+**It no longer bites, though.** The markup has since moved to a `flex: none` `.modal-foot`
+that is a *sibling* of `.modal-scroll` rather than an overlay on top of it, so no content
+can pass behind the band by construction. Forcing `background: transparent` on the footer
+leaves the test green. Treat it as a structural guard, not proof — if the footer ever goes
+back to overlaying the scroll area, rebuild the assertion and re-verify it fails first.
+
+It used to be the one test sensitive to machine load: under a full parallel run the
+compositor could still be a frame behind when the screenshot was taken, so the band differed
+for reasons that had nothing to do with the CSS. It now re-shoots the band until two
+consecutive frames match before recording. That is safe because a real bleed is a
+*steady-state* difference between scroll positions, not a transient one.
 
 ## CSS traps
 
@@ -253,6 +265,33 @@ passed on every isolated re-run. If it fails alone, believe it. If it fails only
   the movable state, which changes every move. Setting it in both places is how it rots.
 - **Assistive tech cannot see the gap at all** without `#board-status`. `role="application"`
   on the board means the app owns every announcement, so nothing is reported for free.
+
+## Keyboard cursor traps
+
+- **The arrow keys mean two different things.** Inside `#board` they move the cursor; anywhere
+  else they keep the original meaning (push the neighbouring block into the gap). The branch is
+  `boardHasFocus()` in the keydown handler. A mouse click on a tile would silently flip the user
+  into cursor mode, so the tile click handler **blurs when `e.detail > 0`** — keyboard activation
+  reports `detail === 0`, a real pointer click reports `> 0`.
+- **`syncCursor()` must stay pure.** The first version re-derived `focusCell` from
+  `document.activeElement`, so `moveCursor` set the new cell and `syncCursor` immediately reset it
+  from the *still-focused old* element. Arrows did nothing while every intermediate value looked
+  right. Re-deriving lives in `adoptCursorFromDom()`, called from focus listeners and after slides.
+- **The cursor has to be able to land on the gap** — skipping it steps over the one cell the game
+  is about. The gap has no tile, so its backing `.slot` div is the focus target; exactly one slot
+  is focusable at a time and it is labelled only while it is the gap.
+- **A live region ignores an unchanged string.** `announce()` alternates a trailing space, and it
+  must compare against `el.boardStatus.textContent`, **not** a remembered variable. The variable
+  version deadlocked at `"X "` and stopped announcing entirely.
+- **`.tile { outline: 2px solid transparent }` suppresses the default focus ring**, so keyboard
+  focus on the board was invisible before this existed. `.is-wrong` reuses that outline slot, so
+  the ring has to be drawn explicitly. `.slot` uses `:focus` (it is focused programmatically and
+  `:focus-visible` heuristics are unreliable there); tiles use `:focus-visible`.
+- **Tiles keep DOM identity across slides** — `slideTo` rewrites `tile.dataset.index`. Focus follows
+  the moved block for free, but `state.focusCell` goes stale, hence `adoptCursorFromDom()`.
+- **A board test that hardcodes a direction is a random-board flake.** The board is shuffled on
+  every boot, so `ArrowRight` is a no-op whenever the gap lands in column 0. Derive the direction
+  from `gap % COLS`.
 
 ## SVG icon traps
 

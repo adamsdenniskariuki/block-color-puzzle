@@ -108,6 +108,7 @@ out of the way.
 | Slide blocks | Tap/click any block in the empty slot's row or column |
 | Swipe | Drag on the board — a swipe toward the empty slot slides the whole run at once |
 | Slide with keyboard | Arrow keys push a block into the empty slot |
+| Navigate the board | **Tab** onto the board, then arrow keys move a cursor cell by cell (including onto the empty slot); **Enter**/**Space** slides the selected block |
 | Undo | **Undo** button — steps back one tap |
 | Ask for a nudge | **Hint** — rings the next block to move, three per puzzle |
 | Reshuffle the same layout | **Restart** — replays the identical starting board |

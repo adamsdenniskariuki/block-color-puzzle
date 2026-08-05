@@ -170,6 +170,8 @@
     moves: 0,
     history: [],      // gap positions, newest last
     tiles: [],        // cell index -> tile element (or null)
+    slots: [],        // cell index -> backing slot element
+    focusCell: -1,    // keyboard cursor, -1 when the board is not being driven by keys
     cell: 56,         // px, recomputed by metrics() on layout and resize
     gutter: 6,
     startedAt: 0,
@@ -192,6 +194,14 @@
   // Screen readers get no spatial sense of the grid from a flat list of buttons,
   // so every block and the gap itself carry their 1-based coordinates.
   function positionLabel(i) { return `row ${rowOf(i) + 1}, column ${colOf(i) + 1}`; }
+
+  // A live region ignores an unchanged string, so a repeated message - landing on
+  // the gap twice, say - would be silent. Compare against what is actually in the
+  // DOM and alternate a trailing space, so consecutive repeats still fire.
+  function announce(text) {
+    if (!el.boardStatus) return;
+    el.boardStatus.textContent = text === el.boardStatus.textContent ? text + ' ' : text;
+  }
 
   function applyTheme() {
     const root = document.documentElement;
@@ -635,6 +645,73 @@
     });
   }
 
+  /* ---------------- keyboard cursor ---------------- */
+
+  // The board is a grid, so it gets one tab stop and a cursor the arrow keys
+  // move, rather than 24 tab stops. The gap is part of the grid - skipping it
+  // would teleport the cursor past the one cell the player is hunting for - so
+  // its backing slot is made focusable while it is the gap.
+  function cellEl(i) {
+    if (i < 0 || i >= cellCount()) return null;
+    return state.tiles[i] || (i === state.gap ? state.slots[i] : null);
+  }
+
+  function syncGapSlot() {
+    state.slots.forEach((slot, i) => {
+      if (!slot) return;
+      if (i === state.gap) {
+        slot.setAttribute('aria-label', `Empty slot, ${positionLabel(i)}`);
+      } else {
+        slot.removeAttribute('aria-label');
+        slot.removeAttribute('tabindex');
+      }
+    });
+    adoptCursorFromDom();
+  }
+
+  // Exactly one cell is tabbable at a time. Default to the gap, which is where a
+  // player's attention already is.
+  function syncCursor() {
+    if (!cellEl(state.focusCell)) state.focusCell = state.gap;
+    const cursor = state.focusCell;
+
+    state.tiles.forEach((tile, i) => { if (tile) tile.tabIndex = i === cursor ? 0 : -1; });
+    const gapSlot = state.slots[state.gap];
+    if (gapSlot) gapSlot.tabIndex = state.gap === cursor ? 0 : -1;
+  }
+
+  // A slide renumbers the tiles under a still-focused element, and clicking or
+  // tabbing moves focus without going through moveCursor, so the DOM is the
+  // authority whenever the board actually holds focus.
+  function adoptCursorFromDom() {
+    const active = document.activeElement;
+    if (active && el.board.contains(active)) {
+      state.focusCell = active.classList.contains('slot')
+        ? state.gap
+        : Number(active.dataset.index);
+    }
+    syncCursor();
+  }
+
+  function moveCursor(dRow, dCol) {
+    const row = rowOf(state.focusCell) + dRow;
+    const col = colOf(state.focusCell) + dCol;
+    if (row < 0 || row >= state.rows || col < 0 || col >= COLS) return false;
+
+    state.focusCell = row * COLS + col;
+    syncCursor();
+    const target = cellEl(state.focusCell);
+    if (target) target.focus();
+    // A focused tile is announced natively; a plain div is not reliably, so the
+    // gap goes through the live region.
+    if (state.focusCell === state.gap) announce(`Empty slot, ${positionLabel(state.gap)}.`);
+    return true;
+  }
+
+  function boardHasFocus() {
+    return !!document.activeElement && el.board.contains(document.activeElement);
+  }
+
   /* ---------------- rendering ---------------- */
 
   function renderGuide() {
@@ -652,6 +729,7 @@
   function renderBoard() {
     el.board.innerHTML = '';
     state.tiles = new Array(cellCount()).fill(null);
+    state.slots = new Array(cellCount()).fill(null);
     announcedGap = -1;
 
     // Static backing slots so empty cells read as recesses in the frame.
@@ -659,7 +737,9 @@
       const slot = document.createElement('div');
       slot.className = 'slot';
       slot.style.transform = translateFor(i);
+      slot.addEventListener('focus', () => { adoptCursorFromDom(); });
       el.board.appendChild(slot);
+      state.slots[i] = slot;
     }
 
     for (let i = 0; i < cellCount(); i++) {
@@ -673,13 +753,20 @@
       tile.style.transform = translateFor(i);
       tile.dataset.index = String(i);
       tile.dataset.colour = String(colour);
+      tile.tabIndex = -1;   // the board is one tab stop; syncCursor promotes one cell
       tile.textContent = el.symbols.checked ? SYMBOLS[colour] : '';
       // aria-label is owned by refreshTileState, which runs at the end of this
       // function - it needs the movable state, which changes every move.
-      tile.addEventListener('click', () => {
+      tile.addEventListener('click', e => {
         if (fromSwipe()) return;
-        slideTo(Number(tile.dataset.index), true);
+        const index = Number(tile.dataset.index);
+        // A keyboard activation reports detail 0. A real click should not leave
+        // focus parked on the board, or plain arrows would silently switch from
+        // pushing blocks to moving a cursor under a mouse user.
+        if (e.detail > 0) tile.blur();
+        slideTo(index, true);
       });
+      tile.addEventListener('focus', () => { adoptCursorFromDom(); });
 
       el.board.appendChild(tile);
       state.tiles[i] = tile;
@@ -807,10 +894,12 @@
       tile.setAttribute('aria-label', movable && !state.solved ? `${label}, movable` : label);
     });
 
-    if (announcedGap !== state.gap && el.boardStatus) {
+    if (announcedGap !== state.gap) {
       announcedGap = state.gap;
-      el.boardStatus.textContent = `Empty slot ${positionLabel(state.gap)}.`;
+      announce(`Empty slot ${positionLabel(state.gap)}.`);
     }
+
+    syncGapSlot();
 
     el.board.classList.toggle('is-solved', state.solved);
     el.undo.disabled = state.history.length === 0 || state.solved;
@@ -1437,6 +1526,16 @@
     };
     if (!(e.key in map)) return;
 
+    // Two arrow-key modes, chosen by where focus is. Tab into the board and the
+    // arrows drive a cursor you then activate with Enter, which is the only way
+    // to play without sight. Focus anywhere else and they keep their original
+    // meaning: push the neighbouring block into the gap.
+    if (boardHasFocus()) {
+      const step = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key];
+      if (moveCursor(step[0], step[1])) e.preventDefault();
+      return;
+    }
+
     const source = state.gap + map[e.key];
     if (source < 0 || source >= cellCount()) return;
     // Horizontal moves must stay on the gap's row.
@@ -1545,6 +1644,7 @@
   if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
     window.__bcp = {
       state, el, finish, isSolved, todayKey, isPreviousDay,
+      moveCursor, syncCursor, cellEl,
       loadDaily, recordDaily, shareText,
       loadLevels, saveLevels, recordLevel, starsFor, levelSpec, playLevel,
       openLevelPicker, parFor, misplaced, setMode, newGame, restart, LEVEL_COUNT,

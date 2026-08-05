@@ -532,6 +532,134 @@ test('the empty slot is announced, and again wherever it moves to', async () => 
   h.close();
 });
 
+/* ---------------- keyboard navigation ---------------- */
+
+// Twenty-four buttons in the tab order is not navigation, it is a maze. A grid
+// gets one tab stop and a cursor, so the board can be reached and left in two
+// keystrokes.
+test('the whole board is a single tab stop, starting on the gap', async () => {
+  const h = await fresh();
+  const { state } = h.bcp;
+
+  const tabbable = h.$$('#board [tabindex="0"]');
+  assert.equal(tabbable.length, 1, 'exactly one cell should be in the tab order');
+  assert.equal(h.bcp.cellEl(state.gap), tabbable[0],
+    'the tab stop should start on the empty slot, where the player is looking');
+
+  const others = h.$$('#board .tile').filter(t => t.getAttribute('tabindex') !== '0');
+  assert.equal(others.length, h.$$('#board .tile').length - (state.tiles[state.gap] ? 1 : 0));
+  for (const t of others) {
+    assert.equal(t.getAttribute('tabindex'), '-1', 'every other block must be skipped by Tab');
+  }
+
+  h.close();
+});
+
+// Without this the board is observable but not playable: a screen reader user
+// can hear where the gap is and never reach the block they want to move.
+test('the arrow keys walk a cursor around the board', async () => {
+  const h = await fresh();
+  const { state, COLS } = h.bcp;
+
+  // Somewhere off every edge, so all four directions are legal.
+  let start = -1;
+  for (let i = 0; i < state.rows * COLS; i++) {
+    const r = Math.floor(i / COLS), c = i % COLS;
+    if (r > 0 && r < state.rows - 1 && c > 0 && c < COLS - 1) { start = i; break; }
+  }
+  h.bcp.cellEl(start).focus();
+  assert.equal(state.focusCell, start, 'focusing a cell should place the cursor on it');
+
+  const moves = [['ArrowRight', 1], ['ArrowLeft', -1], ['ArrowDown', COLS], ['ArrowUp', -COLS]];
+  for (const [key, delta] of moves) {
+    const from = state.focusCell;
+    h.key(key);
+    assert.equal(state.focusCell, from + delta, `${key} should move the cursor by ${delta}`);
+    assert.equal(h.win.document.activeElement, h.bcp.cellEl(state.focusCell),
+      `${key} should move focus with the cursor, not just the bookkeeping`);
+    assert.equal(h.$$('#board [tabindex="0"]').length, 1, 'still exactly one tab stop');
+  }
+
+  h.close();
+});
+
+// The cursor must be able to stop on the gap. Skipping it would jump the cursor
+// clean over the one cell the whole game is about finding.
+test('the cursor can rest on the empty slot itself', async () => {
+  const h = await fresh();
+  const { state, COLS } = h.bcp;
+
+  const gapSlot = h.bcp.cellEl(state.gap);
+  assert.ok(gapSlot, 'the gap should expose something focusable');
+  assert.ok(gapSlot.classList.contains('slot'), 'that something is the backing slot');
+
+  const row = Math.floor(state.gap / COLS) + 1;
+  const col = (state.gap % COLS) + 1;
+  assert.match(gapSlot.getAttribute('aria-label') || '',
+    new RegExp(`empty slot,\\s*row ${row}, column ${col}`, 'i'),
+    'the focusable gap should say it is the gap, and where');
+
+  // Only the current gap is reachable; the other slots are inert scenery.
+  const focusableSlots = h.$$('#board .slot').filter(s => s.hasAttribute('tabindex'));
+  assert.deepEqual(focusableSlots, [gapSlot], 'only the gap slot should be focusable');
+
+  h.close();
+});
+
+// Focus lives on a DOM node, but a slide renumbers every cell underneath it. If
+// the cursor is not re-derived the tab stop drifts onto a different block.
+test('the cursor follows the block it just slid', async () => {
+  const h = await fresh();
+  const { state, COLS } = h.bcp;
+
+  const gapBefore = state.gap;
+  const target = gapBefore % COLS === 0 ? gapBefore + 1 : gapBefore - 1;
+  const tile = h.bcp.cellEl(target);
+  tile.focus();
+  // Without this the test is vacuous: the cursor defaults to the gap, which is
+  // exactly where the block ends up, so a cursor that never updates still looks
+  // correct after the slide.
+  assert.equal(state.focusCell, target, 'focusing a block should put the cursor on it');
+
+  h.bcp.slideTo(target, true);
+  await h.tick();
+
+  assert.equal(state.gap, target, 'the slide should have happened');
+  assert.equal(h.win.document.activeElement, tile, 'focus should stay on the block that moved');
+  assert.equal(state.focusCell, gapBefore, 'the cursor should have followed it to its new cell');
+  assert.equal(tile.getAttribute('tabindex'), '0', 'and it should still be the tab stop');
+  assert.equal(h.$$('#board [tabindex="0"]').length, 1, 'still exactly one tab stop');
+
+  h.close();
+});
+
+// The original binding - arrows push the neighbouring block into the gap - is
+// how everyone plays today. Adding a cursor must not quietly take it away.
+test('the arrow keys still push blocks when the board does not have focus', async () => {
+  const h = await fresh();
+  const { state, COLS } = h.bcp;
+
+  h.win.document.body.focus();
+  if (h.win.document.activeElement && h.win.document.activeElement.blur) {
+    h.win.document.activeElement.blur();
+  }
+
+  const before = state.gap;
+  // Pick a direction that actually has a block to pull in. Column 0 has no left
+  // neighbour, so ArrowRight would be a no-op there and the board is shuffled
+  // randomly on every boot.
+  const key = before % COLS === 0 ? 'ArrowLeft' : 'ArrowRight';
+  const expected = key === 'ArrowLeft' ? before + 1 : before - 1;
+
+  h.key(key);
+  await h.tick();
+
+  assert.equal(state.gap, expected, `${key} should still push a block into the gap`);
+  assert.ok(state.moves > 0, 'and it should count as a move');
+
+  h.close();
+});
+
 /* ---------------- stats ---------------- */
 
 test('the stats screen fills every card from storage', async () => {
