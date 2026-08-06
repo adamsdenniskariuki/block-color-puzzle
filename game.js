@@ -90,6 +90,9 @@
 
   const COLS = 5;                   // one column per colour
   const STORAGE_KEY = 'bcp.v1';
+  const EXPORT_FORMAT = 'sortile-settings-and-stats';
+  const EXPORT_VERSION = 1;
+  const MAX_IMPORT_BYTES = 256 * 1024;
   const SCRAMBLE_PER_CELL = 24;     // scramble slides, scaled by board size
   const DAILY_ROWS = 5;             // the daily puzzle is always Normal
   const LEVEL_COUNT = 24;           // campaign length
@@ -134,6 +137,10 @@
     help:     document.getElementById('help'),
     settings: document.getElementById('settings'),
     confirmNew: document.getElementById('confirm-new'),
+    confirmImport: document.getElementById('confirm-import'),
+    importSummary: document.getElementById('import-summary'),
+    importFile: document.getElementById('import-file'),
+    dataStatus: document.getElementById('data-status'),
     stats:    document.getElementById('stats'),
     statsGrid: document.getElementById('stats-grid'),
     statsSince: document.getElementById('stats-since'),
@@ -346,6 +353,322 @@
   function saveStore(data) {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
     catch { /* private mode - ignore */ }
+  }
+
+  function plainObject(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function exactKeys(value, keys, label) {
+    if (!plainObject(value)) throw new Error(label + ' must be an object.');
+    const actual = Object.keys(value).sort();
+    const expected = keys.slice().sort();
+    if (actual.length !== expected.length || actual.some((key, i) => key !== expected[i])) {
+      throw new Error(label + ' has unknown or missing fields.');
+    }
+  }
+
+  function nonNegativeInt(value, label) {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(label + ' must be a non-negative whole number.');
+    }
+  }
+
+  function positiveInt(value, label) {
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      throw new Error(label + ' must be a positive whole number.');
+    }
+  }
+
+  function validDay(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(value + 'T00:00:00Z');
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }
+
+  function validTimestamp(value) {
+    if (typeof value !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
+    const date = new Date(value);
+    return !Number.isNaN(date.getTime()) && date.toISOString() === value;
+  }
+
+  function validateResult(result, label, withStars = false) {
+    const keys = withStars ? ['stars', 'moves', 'ms'] : ['moves', 'ms'];
+    exactKeys(result, keys, label);
+    positiveInt(result.moves, label + '.moves');
+    positiveInt(result.ms, label + '.ms');
+    if (withStars && ![1, 2, 3].includes(result.stars)) {
+      throw new Error(label + '.stars must be 1, 2 or 3.');
+    }
+  }
+
+  function normalizedModeStats(byMode) {
+    const fields = ['started', 'solved', 'moves', 'ms', 'hints', 'undos'];
+    const out = {};
+    for (const mode of ['free', 'daily', 'levels']) {
+      const source = plainObject(byMode && byMode[mode]) ? byMode[mode] : {};
+      out[mode] = Object.fromEntries(fields.map(key => [key, source[key] || 0]));
+    }
+    return out;
+  }
+
+  function buildExportData(now = new Date()) {
+    const store = loadStore();
+    const stats = loadStats();
+    const daily = loadDaily();
+    const levels = loadLevels();
+    const paletteId = PALETTE_ALIASES[store.palette] || store.palette;
+    const appearanceId = APPEARANCE_ALIASES[store.appearance] || store.appearance;
+
+    const data = {
+      format: EXPORT_FORMAT,
+      version: EXPORT_VERSION,
+      exportedAt: now.toISOString(),
+      settings: {
+        rows: [4, 5, 6].includes(store.rows) ? store.rows : 5,
+        fadeUnsorted: !!store.hints,
+        symbols: !!store.symbols,
+        sound: store.sound !== false,
+        vibrate: store.haptics !== false,
+        palette: PALETTES[paletteId] ? paletteId : 'classic',
+        appearance: APPEARANCES[appearanceId] ? appearanceId : 'dark'
+      },
+      stats: {
+        lifetime: {
+          started: stats.started,
+          solved: stats.solved,
+          moves: stats.moves,
+          ms: stats.ms,
+          hints: stats.hints,
+          undos: stats.undos,
+          firstAt: stats.firstAt,
+          byMode: normalizedModeStats(stats.byMode)
+        },
+        best: {
+          easy: store.best4 || null,
+          normal: store.best5 || null,
+          hard: store.best6 || null
+        },
+        daily: {
+          last: daily.last,
+          streak: daily.streak,
+          best: daily.best,
+          results: daily.results
+        },
+        levels: {
+          unlocked: levels.unlocked,
+          current: levels.current,
+          results: levels.results
+        }
+      }
+    };
+    validateImportData(data);
+    return data;
+  }
+
+  function validateImportData(data) {
+    exactKeys(data, ['format', 'version', 'exportedAt', 'settings', 'stats'], 'Export');
+    if (data.format !== EXPORT_FORMAT) throw new Error('This is not a Sortile settings and stats export.');
+    if (data.version !== EXPORT_VERSION) throw new Error('This export version is not supported.');
+    if (!validTimestamp(data.exportedAt)) {
+      throw new Error('Export.exportedAt is not a valid UTC timestamp.');
+    }
+
+    const settings = data.settings;
+    exactKeys(settings,
+      ['rows', 'fadeUnsorted', 'symbols', 'sound', 'vibrate', 'palette', 'appearance'],
+      'Settings');
+    if (![4, 5, 6].includes(settings.rows)) throw new Error('Settings.rows must be 4, 5 or 6.');
+    for (const key of ['fadeUnsorted', 'symbols', 'sound', 'vibrate']) {
+      if (typeof settings[key] !== 'boolean') throw new Error('Settings.' + key + ' must be true or false.');
+    }
+    if (!PALETTES[settings.palette]) throw new Error('Settings.palette is not supported.');
+    if (!APPEARANCES[settings.appearance]) throw new Error('Settings.appearance is not supported.');
+
+    exactKeys(data.stats, ['lifetime', 'best', 'daily', 'levels'], 'Stats');
+    const lifetime = data.stats.lifetime;
+    exactKeys(lifetime,
+      ['started', 'solved', 'moves', 'ms', 'hints', 'undos', 'firstAt', 'byMode'],
+      'Stats.lifetime');
+    for (const key of ['started', 'solved', 'moves', 'ms', 'hints', 'undos']) {
+      nonNegativeInt(lifetime[key], 'Stats.lifetime.' + key);
+    }
+    if (lifetime.solved > lifetime.started) throw new Error('Solved puzzles cannot exceed started puzzles.');
+    if (lifetime.firstAt !== null) positiveInt(lifetime.firstAt, 'Stats.lifetime.firstAt');
+    exactKeys(lifetime.byMode, ['free', 'daily', 'levels'], 'Stats.lifetime.byMode');
+    for (const mode of ['free', 'daily', 'levels']) {
+      const bucket = lifetime.byMode[mode];
+      exactKeys(bucket, ['started', 'solved', 'moves', 'ms', 'hints', 'undos'],
+        'Stats.lifetime.byMode.' + mode);
+      for (const key of ['started', 'solved', 'moves', 'ms', 'hints', 'undos']) {
+        nonNegativeInt(bucket[key], 'Stats.lifetime.byMode.' + mode + '.' + key);
+      }
+      if (bucket.solved > bucket.started) {
+        throw new Error('Solved ' + mode + ' puzzles cannot exceed started puzzles.');
+      }
+    }
+
+    exactKeys(data.stats.best, ['easy', 'normal', 'hard'], 'Stats.best');
+    for (const key of ['easy', 'normal', 'hard']) {
+      if (data.stats.best[key] !== null) validateResult(data.stats.best[key], 'Stats.best.' + key);
+    }
+
+    const daily = data.stats.daily;
+    exactKeys(daily, ['last', 'streak', 'best', 'results'], 'Stats.daily');
+    if (daily.last !== null && !validDay(daily.last)) throw new Error('Stats.daily.last is not a valid date.');
+    nonNegativeInt(daily.streak, 'Stats.daily.streak');
+    nonNegativeInt(daily.best, 'Stats.daily.best');
+    if (daily.best < daily.streak) throw new Error('Best daily streak cannot be shorter than the current streak.');
+    if (!plainObject(daily.results) || Object.keys(daily.results).length > 60) {
+      throw new Error('Stats.daily.results must contain at most 60 days.');
+    }
+    for (const [day, result] of Object.entries(daily.results)) {
+      if (!validDay(day)) throw new Error('Stats.daily.results contains an invalid date.');
+      validateResult(result, 'Stats.daily.results.' + day);
+    }
+
+    const levels = data.stats.levels;
+    exactKeys(levels, ['unlocked', 'current', 'results'], 'Stats.levels');
+    if (!Number.isSafeInteger(levels.unlocked) || levels.unlocked < 1 || levels.unlocked > LEVEL_COUNT) {
+      throw new Error('Stats.levels.unlocked is outside the campaign.');
+    }
+    if (!Number.isSafeInteger(levels.current) || levels.current < 1 || levels.current > levels.unlocked) {
+      throw new Error('Stats.levels.current must be an unlocked level.');
+    }
+    if (!plainObject(levels.results) || Object.keys(levels.results).length > LEVEL_COUNT) {
+      throw new Error('Stats.levels.results is not valid.');
+    }
+    for (const [level, result] of Object.entries(levels.results)) {
+      const n = Number(level);
+      if (!Number.isSafeInteger(n) || n < 1 || n > LEVEL_COUNT || String(n) !== level) {
+        throw new Error('Stats.levels.results contains an invalid level.');
+      }
+      validateResult(result, 'Stats.levels.results.' + level, true);
+    }
+    return data;
+  }
+
+  function parseImportText(text) {
+    if (typeof text !== 'string' || !text.trim()) throw new Error('Choose a non-empty JSON export.');
+    if (new Blob([text]).size > MAX_IMPORT_BYTES) throw new Error('The import file is too large.');
+    let data;
+    try { data = JSON.parse(text); }
+    catch { throw new Error('The selected file is not valid JSON.'); }
+    return validateImportData(data);
+  }
+
+  function storeFromImport(data) {
+    const next = {
+      rows: data.settings.rows,
+      hints: data.settings.fadeUnsorted,
+      symbols: data.settings.symbols,
+      sound: data.settings.sound,
+      haptics: data.settings.vibrate,
+      palette: data.settings.palette,
+      appearance: data.settings.appearance,
+      stats: data.stats.lifetime,
+      daily: data.stats.daily,
+      levels: data.stats.levels
+    };
+    const bestKeys = { easy: 'best4', normal: 'best5', hard: 'best6' };
+    for (const [name, key] of Object.entries(bestKeys)) {
+      if (data.stats.best[name]) next[key] = data.stats.best[name];
+    }
+    const current = loadStore();
+    if (current.inplay) next.inplay = current.inplay;
+    return next;
+  }
+
+  function replaceImportedData(data) {
+    validateImportData(data);
+    const next = storeFromImport(data);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); }
+    catch { throw new Error('Sortile could not save the imported data on this device.'); }
+    return next;
+  }
+
+  function showDataStatus(message, error = false) {
+    el.dataStatus.textContent = message;
+    el.dataStatus.classList.toggle('is-error', error);
+  }
+
+  function exportDataFile() {
+    try {
+      const data = buildExportData();
+      const text = JSON.stringify(data, null, 2) + '\n';
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'sortile-data-' + data.exportedAt.slice(0, 10) + '.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      showDataStatus('Export ready.');
+    } catch (error) {
+      showDataStatus(error.message || 'Sortile could not create the export file.', true);
+    }
+  }
+
+  let pendingImport = null;
+
+  function stageImportText(text) {
+    try {
+      pendingImport = parseImportText(text);
+      el.importSummary.textContent = 'Exported ' +
+        new Date(pendingImport.exportedAt).toLocaleString() + '.';
+      el.settings.hidden = true;
+      el.confirmImport.hidden = false;
+      return true;
+    } catch (error) {
+      pendingImport = null;
+      showDataStatus(error.message, true);
+      return false;
+    }
+  }
+
+  function cancelImport() {
+    pendingImport = null;
+    el.confirmImport.hidden = true;
+    el.settings.hidden = false;
+  }
+
+  function applyImportedPreferences(data) {
+    el.hints.checked = data.settings.fadeUnsorted;
+    el.symbols.checked = data.settings.symbols;
+    el.sound.checked = data.settings.sound;
+    el.haptics.checked = data.settings.vibrate;
+    state.palette = data.settings.palette;
+    state.appearance = data.settings.appearance;
+    applyTheme();
+    applyFxPrefs();
+    syncThemeUi();
+    repaintColours();
+    state.tiles.forEach(tile => {
+      if (tile) tile.textContent = el.symbols.checked ? SYMBOLS[Number(tile.dataset.colour)] : '';
+    });
+    refreshTileState();
+  }
+
+  function confirmImport() {
+    if (!pendingImport) return false;
+    try {
+      replaceImportedData(pendingImport);
+    } catch (error) {
+      el.confirmImport.hidden = true;
+      el.settings.hidden = false;
+      showDataStatus(error.message, true);
+      return false;
+    }
+    const data = pendingImport;
+    pendingImport = null;
+    el.confirmImport.hidden = true;
+    el.settings.hidden = false;
+    applyImportedPreferences(data);
+    syncModeUi();
+    showDataStatus('Imported. Difficulty applies to your next Free play board.');
+    return true;
   }
 
   function bestKey() { return 'best' + state.rows; }
@@ -1198,6 +1521,10 @@
 
     const daily = state.mode === 'daily';
     const levels = state.mode === 'levels';
+    if (!daily && !levels) {
+      const savedRows = loadStore().rows;
+      state.rows = [4, 5, 6].includes(savedRows) ? savedRows : 5;
+    }
     state.dailyKey = daily ? todayKey() : null;
     if (daily) state.rows = DAILY_ROWS;
 
@@ -1489,10 +1816,12 @@
   function syncModeUi() {
     const free = state.mode === 'free';
     const levels = state.mode === 'levels';
+    const savedRows = loadStore().rows;
+    const preferredRows = free && [4, 5, 6].includes(savedRows) ? savedRows : state.rows;
 
     document.querySelectorAll('.seg-diff .seg-btn').forEach(b => {
       b.disabled = !free;
-      b.classList.toggle('is-active', free && Number(b.dataset.rows) === state.rows);
+      b.classList.toggle('is-active', free && Number(b.dataset.rows) === preferredRows);
     });
 
     const daily = state.mode === 'daily';
@@ -1633,6 +1962,23 @@
   document.getElementById('btn-settings-close').addEventListener('click', () => { el.settings.hidden = true; });
   el.settings.addEventListener('click', e => { if (e.target === el.settings) el.settings.hidden = true; });
 
+  document.getElementById('btn-export-data').addEventListener('click', exportDataFile);
+  document.getElementById('btn-import-data').addEventListener('click', () => { el.importFile.click(); });
+  el.importFile.addEventListener('change', async () => {
+    const file = el.importFile.files && el.importFile.files[0];
+    el.importFile.value = '';
+    if (!file) return;
+    if (file.size > MAX_IMPORT_BYTES) {
+      showDataStatus('The import file is too large.', true);
+      return;
+    }
+    try { stageImportText(await file.text()); }
+    catch { showDataStatus('Sortile could not read the selected file.', true); }
+  });
+  document.getElementById('btn-confirm-import').addEventListener('click', confirmImport);
+  document.getElementById('btn-import-cancel').addEventListener('click', cancelImport);
+  el.confirmImport.addEventListener('click', e => { if (e.target === el.confirmImport) cancelImport(); });
+
   document.getElementById('btn-stats').addEventListener('click', () => {
     renderStats();
     el.stats.hidden = false;
@@ -1642,14 +1988,19 @@
 
   // Arrow keys push a block in the pressed direction, into the gap.
   document.addEventListener('keydown', e => {
-    const openModal = !el.confirmNew.hidden ? el.confirmNew
+    const openModal = !el.confirmImport.hidden ? el.confirmImport
+      : !el.confirmNew.hidden ? el.confirmNew
       : !el.levels.hidden ? el.levels
       : !el.stats.hidden ? el.stats
       : !el.settings.hidden ? el.settings
       : !el.help.hidden ? el.help : null;
     if (openModal) {
       // A modal owns the keyboard while it is up, so the board must not move.
-      if (e.key === 'Escape') { openModal.hidden = true; e.preventDefault(); }
+      if (e.key === 'Escape') {
+        if (openModal === el.confirmImport) cancelImport();
+        else openModal.hidden = true;
+        e.preventDefault();
+      }
       return;
     }
 
@@ -1804,6 +2155,8 @@
       setPalette, setAppearance, palette, colourHex, PALETTES, APPEARANCES,
       PALETTE_ALIASES, APPEARANCE_ALIASES,
       loadStore, saveStore, getBest, recordBest, loadPrefs, savePrefs,
+      buildExportData, validateImportData, parseImportText, storeFromImport,
+      replaceImportedData, stageImportText, confirmImport, EXPORT_FORMAT, EXPORT_VERSION,
       seedFrom, mulberry32, shuffled, neighbours, buildSolved, scramble,
       renderBoard, renderGuide, layout,
       undo, applySwipe, syncHintButton, COLS, STORAGE_KEY, SCRAMBLE_PER_CELL

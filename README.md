@@ -113,6 +113,12 @@ Four buttons sit under the board — **Undo**, **Hint**, **Restart**, and **⚙*
 The gear opens a settings sheet holding difficulty, colours, appearance and the
 four set-and-forget toggles.
 
+The **Saved data** section in Settings exports those preferences together with
+lifetime statistics, daily history and level progress as a readable JSON file.
+Import validates the whole file first, then asks before replacing the saved
+settings and statistics in one step. The puzzle currently in progress is not
+included in an export and stays open through an import.
+
 | Action | How |
 | --- | --- |
 | Slide blocks | Tap/click any block in the empty slot's row or column |
@@ -128,6 +134,7 @@ four set-and-forget toggles.
 | Difficulty | ⚙ — Easy (4 rows) / Normal (5) / Hard (6) — free play only |
 | Colours | ⚙ — Classic / Accessible / Candy / Jewel |
 | Appearance | ⚙ — Dark / Midnight / Slate / Forest / Plum / Amber / Light / Paper |
+| Saved data | ⚙ — export or import settings, statistics and progress |
 | Fade unsorted | ⚙ toggle — drains the colour from every block that is in the wrong column, so the ones already home are the only colour left on the board |
 | Symbols | ⚙ toggle — adds a shape to each colour for colourblind play |
 | Sound | ⚙ toggle — synthesised slide/bump/win tones, no audio files |
@@ -193,10 +200,10 @@ npm test
 
 | Command | What it runs |
 | --- | --- |
-| `npm test` | Unit and integration — 51 tests, no browser needed |
+| `npm test` | Unit, integration and palette — 83 tests, no browser needed |
 | `npm run test:unit` | Pure logic: RNG, formatting, level curve, geometry, solvability |
 | `npm run test:integration` | Real DOM: tapping, keys, undo, hints, modals, modes, persistence |
-| `npm run test:layout` | Sizing in headless Chromium across eleven viewports — 60 tests |
+| `npm run test:layout` | Sizing in headless Chromium across eleven viewports — 105 tests |
 | `npm run test:all` | All of the above |
 
 The unit tests cover the parts with no DOM: seeding and the deterministic RNG, time

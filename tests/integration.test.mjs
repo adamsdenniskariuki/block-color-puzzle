@@ -1110,6 +1110,144 @@ test('a corrupt store is ignored rather than crashing the game', async () => {
   h.close();
 });
 
+test('a confirmed import atomically replaces settings and stats but keeps the current puzzle', async () => {
+  const h = await fresh({
+    storage: {
+      rows: 4,
+      hints: false,
+      symbols: false,
+      sound: true,
+      haptics: true,
+      palette: 'classic',
+      appearance: 'dark',
+      stats: {
+        started: 3, solved: 2, moves: 40, ms: 90000, hints: 1, undos: 2,
+        firstAt: 1700000000000,
+        byMode: { free: { started: 3, solved: 2, moves: 40, ms: 90000, hints: 1, undos: 2 } }
+      },
+      best4: { ms: 20000, moves: 14 },
+      daily: { last: '2026-02-01', streak: 2, best: 4, results: {} },
+      levels: { unlocked: 3, current: 2, results: { 1: { stars: 2, moves: 30, ms: 60000 } } }
+    }
+  });
+
+  const currentPuzzle = JSON.stringify(h.storage().inplay);
+  const exported = h.bcp.buildExportData(new h.win.Date('2026-03-01T12:34:56.000Z'));
+  assert.equal(exported.format, 'sortile-settings-and-stats');
+  assert.equal(exported.version, 1);
+  assert.equal(exported.exportedAt, '2026-03-01T12:34:56.000Z');
+  assert.equal('inplay' in exported, false, 'an export must not contain a live board');
+  assert.deepEqual(Object.keys(exported.settings).sort(),
+    ['appearance', 'fadeUnsorted', 'palette', 'rows', 'sound', 'symbols', 'vibrate']);
+
+  const incoming = JSON.parse(JSON.stringify(exported));
+  Object.assign(incoming.settings, {
+    rows: 6,
+    fadeUnsorted: true,
+    symbols: true,
+    sound: false,
+    vibrate: false,
+    palette: 'candy',
+    appearance: 'midnight'
+  });
+  Object.assign(incoming.stats.lifetime, {
+    started: 9, solved: 7, moves: 123, ms: 456000, hints: 8, undos: 6
+  });
+  incoming.stats.best.easy = null;
+  incoming.stats.best.hard = { ms: 75000, moves: 48 };
+  incoming.stats.daily = {
+    last: '2026-02-28',
+    streak: 5,
+    best: 7,
+    results: { '2026-02-28': { ms: 64000, moves: 35 } }
+  };
+  incoming.stats.levels = {
+    unlocked: 5,
+    current: 4,
+    results: { 1: { stars: 3, moves: 20, ms: 45000 } }
+  };
+
+  const before = JSON.stringify(h.storage());
+  h.click('#btn-settings');
+  assert.equal(h.bcp.stageImportText(JSON.stringify(incoming)), true);
+  assert.equal(h.$('#confirm-import').hidden, false, 'valid data needs explicit confirmation');
+  assert.equal(JSON.stringify(h.storage()), before, 'staging must not write anything');
+
+  const originalSetItem = h.win.Storage.prototype.setItem;
+  let writes = 0;
+  h.win.Storage.prototype.setItem = function (...args) {
+    writes++;
+    return originalSetItem.apply(this, args);
+  };
+  h.click('#btn-confirm-import');
+
+  const stored = h.storage();
+  assert.equal(writes, 1, 'the complete replacement is one storage write');
+  assert.equal(JSON.stringify(stored.inplay), currentPuzzle, 'the current puzzle is preserved');
+  assert.equal(stored.rows, 6);
+  assert.equal(stored.palette, 'candy');
+  assert.equal(stored.appearance, 'midnight');
+  assert.equal(stored.stats.moves, 123);
+  assert.equal(stored.daily.streak, 5);
+  assert.equal(stored.levels.unlocked, 5);
+  assert.deepEqual(stored.best6, { ms: 75000, moves: 48 });
+  assert.equal('best4' in stored, false, 'missing imported bests replace stale records');
+  assert.equal(h.bcp.state.palette, 'candy', 'visual preferences apply immediately');
+  assert.equal(h.bcp.state.rows, 4, 'the open puzzle keeps its original size');
+  assert.equal(h.$('.seg-diff .is-active').dataset.rows, '6',
+    'Settings shows the imported next-board difficulty');
+  assert.equal(h.$('#data-status').textContent,
+    'Imported. Difficulty applies to your next Free play board.');
+
+  h.click('#btn-settings-close');
+  h.click('#btn-new');
+  assert.equal(h.bcp.state.rows, 6, 'the next Free play board uses the imported difficulty');
+  assert.equal(h.bcp.state.board.length, 6 * h.bcp.COLS);
+
+  h.close();
+});
+
+test('malformed or incompatible imports are rejected without changing saved data', async () => {
+  const h = await fresh({ storage: { rows: 5, palette: 'classic', stats: { started: 1 } } });
+  const valid = JSON.parse(JSON.stringify(h.bcp.buildExportData()));
+  const cases = [
+    ['not JSON', '{broken'],
+    ['wrong version', JSON.stringify({ ...valid, version: 2 })],
+    ['unknown root field', JSON.stringify({ ...valid, surprise: true })],
+    ['invalid palette', JSON.stringify({
+      ...valid, settings: { ...valid.settings, palette: 'ultraviolet' }
+    })],
+    ['negative counter', JSON.stringify({
+      ...valid,
+      stats: {
+        ...valid.stats,
+        lifetime: { ...valid.stats.lifetime, moves: -1 }
+      }
+    })],
+    ['malformed daily result', JSON.stringify({
+      ...valid,
+      stats: {
+        ...valid.stats,
+        daily: { ...valid.stats.daily, results: { tomorrow: { ms: 1, moves: 1 } } }
+      }
+    })]
+  ];
+
+  for (const [label, text] of cases) {
+    assert.throws(() => h.bcp.parseImportText(text), undefined, label);
+  }
+
+  const before = JSON.stringify(h.storage());
+  h.click('#btn-settings');
+  assert.equal(h.bcp.stageImportText(cases[1][1]), false);
+  assert.equal(JSON.stringify(h.storage()), before, 'a rejected import cannot partially write');
+  assert.equal(h.$('#confirm-import').hidden, true, 'invalid data never reaches confirmation');
+  assert.match(h.$('#data-status').textContent, /version is not supported/i);
+  assert.equal(h.$('#data-status').classList.contains('is-error'), true);
+
+  h.close();
+});
+
 /* ---------------- resume ---------------- */
 
 /** Play `n` moves on the current board and hand back the storage blob. */

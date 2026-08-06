@@ -140,6 +140,18 @@
   </div>
 </div>
 
+<div id="confirm-import" class="modal" hidden>
+  <div class="modal-card">
+    <h2>Import saved data?</h2>
+    <p class="confirm-note">This replaces all settings, lifetime statistics, daily history and level progress. Your current puzzle stays open.</p>
+    <p id="import-summary" class="field-note"></p>
+    <div class="menu-list">
+      <button id="btn-confirm-import" class="btn btn-danger" type="button">Replace saved data</button>
+      <button id="btn-import-cancel" class="btn primary" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div id="settings" class="modal" hidden>
   <div class="modal-card">
     <h2>Settings</h2>
@@ -181,6 +193,14 @@
         <span class="toggle-text">Vibrate</span>
       </label>
     </div>
+
+    <p class="field-label">Saved data</p>
+    <div class="data-actions">
+      <button id="btn-export-data" class="btn" type="button">Export</button>
+      <button id="btn-import-data" class="btn" type="button">Import</button>
+      <input id="import-file" type="file" accept="application/json,.json" hidden>
+    </div>
+    <p id="data-status" class="field-note data-status" role="status" aria-live="polite"></p>
 
     <button id="btn-settings-close" class="btn primary" type="button">Done</button>
   </div>

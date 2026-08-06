@@ -806,7 +806,20 @@ h2 + .field-label { margin-top: 0; }
   color: var(--text-dim);
 }
 
-#settings .toggles { margin-bottom: 20px; }
+#settings .toggles { margin-bottom: 0; }
+
+.data-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.data-status {
+  min-height: 18px;
+  margin-bottom: 12px;
+}
+
+.data-status.is-error { color: var(--danger); }
 
 /* ---------- level picker ---------- */
 

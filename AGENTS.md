@@ -64,17 +64,17 @@ Allow 30s–2min for the build.
 
 ```powershell
 npm install       # jsdom + playwright, dev-only
-npm run test:all  # 184 tests, about 15s
+npm run test:all  # 188 tests, about 25s
 ```
 
 | Command | Tests | Needs a browser |
 | --- | --- | --- |
 | `npm run test:unit` | 17 | no |
-| `npm run test:integration` | 59 | no |
+| `npm run test:integration` | 62 | no |
 | `npm run test:palette` | 4 | no |
-| `npm test` | 80 | no |
-| `npm run test:layout` | 104 | yes, headless Chromium |
-| `npm run test:all` | 184 | yes |
+| `npm test` | 83 | no |
+| `npm run test:layout` | 105 | yes, headless Chromium |
+| `npm run test:all` | 188 | yes |
 
 `node --test` runs files in parallel but the tests *inside* a file serially. The two
 big suites each take about 13s, so `test:all` costs about what the slowest file costs.
@@ -307,6 +307,45 @@ consecutive frames match before recording. That is safe because a real bleed is 
 - **"Started" counts on the first move, not on the deal.** Opening the app and closing it again
   used to log a started puzzle and drag the finish rate down for free. The bump lives in
   `slideTo()` behind `if (!state.counted)`.
+
+## Main-screen layout traps
+
+- **The DOM order is the task order:** title, mode row, HUD, board, actions. Keep the mode
+  selector out of Settings; `#btn-new` shares that row, becomes Choose level in Levels, and
+  is hidden in Daily.
+- **`#mode-note` always owns its line.** Empty Free-play copy must not collapse the element,
+  or changing modes changes `verticalBudget()` and makes the board jump.
+- **Board sizing starts from the space left after the mode row and reserved note.** Phones
+  grow into that budget; the 78px cell cap keeps tablets from turning into a wall of tiles.
+  Do not add mode-specific height arithmetic.
+- **The action row is direct:** Undo, Hint, Restart, Settings. There is no More sheet, so do
+  not reintroduce hidden duplicates that jsdom can still click.
+
+## Hint reuse traps
+
+- **A charged hint belongs to a board position, not a button press.** Repeated presses before
+  a move reuse the cached solver answer, restart its pulse, and do not decrement the allowance
+  or increment lifetime statistics.
+- **Zero remaining does not immediately kill the last answer.** The third charged hint stays
+  repeatable until the board changes; the move path invalidates the cache and then disables
+  Hint. New game and Restart clear it as well.
+
+## Import/export traps
+
+- **The portable JSON envelope is not the storage schema.** It has format
+  `sortile-settings-and-stats`, an integer version, an ISO timestamp, readable setting names,
+  and normalized statistics. Import maps it back into the existing `bcp.v1` keys; do not add a
+  second localStorage record.
+- **`inplay` is deliberately excluded.** Export transfers preferences and achievements, not a
+  board position. Import preserves the local `inplay` value so the open puzzle survives.
+- **Validate everything before asking or writing.** Exact shapes, supported IDs, bounded
+  campaign/date collections, and non-negative safe integers are checked into a complete
+  replacement object. Invalid or incompatible files show an error and never open confirmation.
+- **Confirmation is the write boundary.** Staging only holds parsed data in memory; confirming
+  performs one `localStorage.setItem`, which prevents partial replacement. Imported preferences
+  repaint the open board, while imported difficulty applies to the next Free-play board.
+- **Portable names intentionally differ from legacy storage names.** `fadeUnsorted` maps to
+  `hints`, and `vibrate` maps to `haptics`. Keep those translations explicit.
 
 ## Resume traps
 
