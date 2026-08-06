@@ -361,6 +361,126 @@ test('the settings sheet opens, toggles persist, and it closes', async () => {
   h.close();
 });
 
+test('Data & backup owns transfer controls and restores Settings with focus on every close path', async () => {
+  const h = await fresh();
+  const open = () => {
+    h.click('#btn-settings');
+    h.click('#btn-data-backup');
+    assert.equal(h.$('#settings').hidden, true);
+    assert.equal(h.$('#data-backup').hidden, false);
+    assert.equal(h.doc.activeElement, h.$('#data-backup-title'));
+    assert.equal(h.$('#settings #btn-export-data'), null, 'transfer controls must not remain inline');
+    assert.ok(h.$('#data-backup #btn-export-data'));
+    assert.ok(h.$('#data-backup #btn-import-data'));
+    h.$('#btn-data-backup-back').focus();
+    h.key('Tab');
+    assert.equal(h.doc.activeElement, h.$('#btn-export-data'), 'Tab wraps inside the dialog');
+  };
+
+  open();
+  h.click('#btn-data-backup-back');
+  assert.equal(h.$('#data-backup').hidden, true);
+  assert.equal(h.$('#settings').hidden, false);
+  assert.equal(h.doc.activeElement, h.$('#btn-data-backup'));
+
+  open();
+  h.key('Escape');
+  assert.equal(h.$('#settings').hidden, false);
+  assert.equal(h.doc.activeElement, h.$('#btn-data-backup'));
+
+  open();
+  h.click('#data-backup');
+  assert.equal(h.$('#settings').hidden, false);
+  assert.equal(h.doc.activeElement, h.$('#btn-data-backup'));
+
+  h.close();
+});
+
+test('export and import announce preparation and expose a busy state', async () => {
+  const h = await fresh();
+  let downloads = 0;
+  h.win.URL.createObjectURL = () => 'blob:sortile-export';
+  h.win.URL.revokeObjectURL = () => {};
+  h.win.HTMLAnchorElement.prototype.click = () => { downloads++; };
+
+  h.click('#btn-settings');
+  h.click('#btn-data-backup');
+  h.click('#btn-export-data');
+  assert.equal(h.$('#data-status').textContent, 'Preparing export...');
+  assert.equal(h.$('#data-backup').getAttribute('aria-busy'), 'true');
+  assert.equal(h.$('#btn-export-data').disabled, true);
+  assert.equal(h.$('#btn-import-data').disabled, true);
+
+  await h.waitFor(() => h.$('#data-status').textContent === 'Export ready.', {
+    label: 'export preparation'
+  });
+  assert.equal(downloads, 1);
+  assert.equal(h.$('#data-backup').hasAttribute('aria-busy'), false);
+  assert.equal(h.$('#btn-export-data').disabled, false);
+  assert.equal(h.$('#btn-import-data').disabled, false);
+
+  h.click('#btn-import-data');
+  assert.equal(h.$('#data-status').textContent, 'Choose a Sortile export file.');
+
+  let finishReading;
+  const reading = new Promise(resolve => { finishReading = resolve; });
+  Object.defineProperty(h.$('#import-file'), 'files', {
+    configurable: true,
+    value: [{ size: 100, text: () => reading }]
+  });
+  h.$('#import-file').dispatchEvent(new h.win.Event('change', { bubbles: true }));
+  assert.equal(h.$('#data-status').textContent, 'Checking import...');
+  assert.equal(h.$('#data-backup').getAttribute('aria-busy'), 'true');
+  assert.equal(h.$('#btn-export-data').disabled, true);
+  assert.equal(h.$('#btn-import-data').disabled, true);
+
+  finishReading(JSON.stringify(h.bcp.buildExportData()));
+  await h.waitFor(() => !h.$('#confirm-import').hidden, {
+    label: 'import confirmation'
+  });
+  assert.equal(h.$('#data-backup').hasAttribute('aria-busy'), false);
+  assert.equal(h.$('#btn-export-data').disabled, false);
+  assert.equal(h.$('#btn-import-data').disabled, false);
+
+  h.close();
+});
+
+test('import confirmation returns to Data & backup on Cancel, Escape, and backdrop', async () => {
+  const h = await fresh();
+  const valid = JSON.stringify(h.bcp.buildExportData());
+  const openConfirmation = () => {
+    h.click('#btn-settings');
+    h.click('#btn-data-backup');
+    assert.equal(h.bcp.stageImportText(valid), true);
+    assert.equal(h.$('#settings').hidden, true);
+    assert.equal(h.$('#data-backup').hidden, true);
+    assert.equal(h.$('#confirm-import').hidden, false);
+    assert.equal(h.doc.activeElement, h.$('#confirm-import-title'));
+  };
+  const assertReturned = () => {
+    assert.equal(h.$('#confirm-import').hidden, true);
+    assert.equal(h.$('#data-backup').hidden, false);
+    assert.equal(h.$('#settings').hidden, true);
+    assert.equal(h.doc.activeElement, h.$('#btn-import-data'));
+  };
+
+  openConfirmation();
+  h.click('#btn-import-cancel');
+  assertReturned();
+  h.click('#btn-data-backup-back');
+
+  openConfirmation();
+  h.key('Escape');
+  assertReturned();
+  h.click('#btn-data-backup-back');
+
+  openConfirmation();
+  h.click('#confirm-import');
+  assertReturned();
+
+  h.close();
+});
+
 test('feedback build metadata matches the package and service-worker cache', async () => {
   const h = await fresh();
   const packageData = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -1340,8 +1460,11 @@ test('a confirmed import atomically replaces settings and stats but keeps the cu
 
   const before = JSON.stringify(h.storage());
   h.click('#btn-settings');
+  h.click('#btn-data-backup');
   assert.equal(h.bcp.stageImportText(JSON.stringify(incoming)), true);
   assert.equal(h.$('#confirm-import').hidden, false, 'valid data needs explicit confirmation');
+  assert.equal(h.$('#data-backup').hidden, true, 'confirmation replaces the transfer dialog');
+  assert.equal(h.doc.activeElement, h.$('#confirm-import-title'));
   assert.equal(JSON.stringify(h.storage()), before, 'staging must not write anything');
 
   const originalSetItem = h.win.Storage.prototype.setItem;
@@ -1369,7 +1492,11 @@ test('a confirmed import atomically replaces settings and stats but keeps the cu
     'Settings shows the imported next-board difficulty');
   assert.equal(h.$('#data-status').textContent,
     'Imported. Difficulty applies to your next Free play board.');
+  assert.equal(h.$('#data-backup').hidden, false, 'completion returns to transfer tools');
+  assert.equal(h.$('#settings').hidden, true);
+  assert.equal(h.doc.activeElement, h.$('#btn-import-data'));
 
+  h.click('#btn-data-backup-back');
   h.click('#btn-settings-close');
   h.click('#btn-new');
   assert.equal(h.bcp.state.rows, 6, 'the next Free play board uses the imported difficulty');
@@ -1410,11 +1537,14 @@ test('malformed or incompatible imports are rejected without changing saved data
 
   const before = JSON.stringify(h.storage());
   h.click('#btn-settings');
+  h.click('#btn-data-backup');
   assert.equal(h.bcp.stageImportText(cases[1][1]), false);
   assert.equal(JSON.stringify(h.storage()), before, 'a rejected import cannot partially write');
   assert.equal(h.$('#confirm-import').hidden, true, 'invalid data never reaches confirmation');
   assert.match(h.$('#data-status').textContent, /version is not supported/i);
   assert.equal(h.$('#data-status').classList.contains('is-error'), true);
+  assert.equal(h.$('#data-backup').hidden, false, 'errors stay with the transfer controls');
+  assert.equal(h.$('#settings').hidden, true);
 
   h.close();
 });

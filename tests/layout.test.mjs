@@ -1013,7 +1013,7 @@ test('settings swatch labels stay inside their cards', async (t) => {
   await context.close();
 });
 
-test('Settings scrolls behind a fixed reachable Done footer on phones', async (t) => {
+test('Settings keeps a fixed reachable Done footer on phones', async (t) => {
   const context = await browser.newContext();
   context.setDefaultTimeout(10000);
   const page = await context.newPage();
@@ -1039,7 +1039,10 @@ test('Settings scrolls behind a fixed reachable Done footer on phones', async (t
         const cardRect = card.getBoundingClientRect();
         const doneRect = done.getBoundingClientRect();
         return {
+          split: card.classList.contains('modal-card-split'),
+          bodyAndFooterAreSiblings: body.parentElement === card && foot.parentElement === card,
           scrolled: body.scrollTop,
+          maxScroll: body.scrollHeight - body.clientHeight,
           footBefore: before.top,
           footAfter: after.top,
           cardBottom: cardRect.bottom,
@@ -1047,11 +1050,46 @@ test('Settings scrolls behind a fixed reachable Done footer on phones', async (t
         };
       });
 
-      assert.ok(result.scrolled > 0, 'Settings body should have independent scroll room');
+      assert.equal(result.split, true, 'Settings must keep the split-card structure');
+      assert.equal(result.bodyAndFooterAreSiblings, true, 'body and footer must remain separate');
+      if (result.maxScroll > SLACK) {
+        assert.ok(result.scrolled > 0, 'an overflowing Settings body should scroll independently');
+      }
       assert.equal(result.footAfter, result.footBefore, 'footer must not move when the body scrolls');
       assert.ok(result.doneBottom <= result.cardBottom + SLACK, 'Done must stay inside the visible card');
     });
   }
+
+  await context.close();
+});
+
+test('Data & backup modal keeps transfer actions contained at 390x844', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  await page.goto(`${server.url}/index.html`);
+  await page.waitForFunction(() => Boolean(window.__bcp));
+  await page.click('#btn-settings');
+  await page.click('#btn-data-backup');
+  await settle(page);
+
+  const m = await page.evaluate(() => {
+    const card = document.querySelector('#data-backup .modal-card');
+    const cardRect = card.getBoundingClientRect();
+    const actions = [...card.querySelectorAll('.btn')].map(node => node.getBoundingClientRect());
+    return {
+      overflow: card.scrollHeight - card.clientHeight,
+      cardContained: cardRect.left >= -1 && cardRect.top >= -1 &&
+        cardRect.right <= innerWidth + 1 && cardRect.bottom <= innerHeight + 1,
+      actionsContained: actions.every(r => r.left >= cardRect.left - 1 && r.top >= cardRect.top - 1 &&
+        r.right <= cardRect.right + 1 && r.bottom <= cardRect.bottom + 1)
+    };
+  });
+
+  assert.ok(m.overflow <= SLACK, `Data & backup should fit without scrolling, overflowed by ${m.overflow}px`);
+  assert.equal(m.cardContained, true);
+  assert.equal(m.actionsContained, true);
 
   await context.close();
 });

@@ -809,11 +809,21 @@ h2 + .field-label { margin-top: 0; }
 
 #settings .toggles { margin-bottom: 0; }
 
+.settings-utilities {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 14px;
+}
+
 .data-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
+
+.data-backup-card { max-width: 380px; }
+.data-backup-intro { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-body); }
+.data-backup-note { margin-bottom: 16px; }
 
 .data-status {
   min-height: 18px;
@@ -822,13 +832,13 @@ h2 + .field-label { margin-top: 0; }
 
 .data-status.is-error { color: var(--danger); }
 
-.feedback-entry {
+.settings-entry {
   width: 100%;
   min-height: 58px;
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 0 0 14px;
+  margin: 0;
   padding: 9px 13px;
   border: 1px solid var(--line);
   border-radius: 11px;
@@ -838,14 +848,14 @@ h2 + .field-label { margin-top: 0; }
   cursor: pointer;
 }
 
-.feedback-entry:hover { border-color: var(--line-strong); }
-.feedback-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.settings-entry:hover { border-color: var(--line-strong); }
+.settings-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.feedback-entry-copy { min-width: 0; flex: 1; display: grid; gap: 3px; }
-.feedback-entry-title { font-size: 14px; font-weight: 700; }
-.feedback-entry-note { font-size: 12px; line-height: 1.3; color: var(--text-dim); }
+.settings-entry-copy { min-width: 0; flex: 1; display: grid; gap: 3px; }
+.settings-entry-title { font-size: 14px; font-weight: 700; }
+.settings-entry-note { font-size: 12px; line-height: 1.3; color: var(--text-dim); }
 
-.feedback-entry-arrow {
+.settings-entry-arrow {
   width: 8px;
   height: 8px;
   flex: none;

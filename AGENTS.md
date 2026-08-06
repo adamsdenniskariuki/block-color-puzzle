@@ -351,6 +351,14 @@ consecutive frames match before recording. That is safe because a real bleed is 
   repaint the open board, while imported difficulty applies to the next Free-play board.
 - **Portable names intentionally differ from legacy storage names.** `fadeUnsorted` maps to
   `hints`, and `vibrate` maps to `haptics`. Keep those translations explicit.
+- **The controls and status belong to `#data-backup`, not Settings.** Settings exposes one
+  compact entry row. A valid import hides that modal for confirmation; cancel, validation
+  failure and completion return to it, while only Back/Escape/backdrop return to Settings.
+  Keep focus moving with the same ownership or keyboard users land behind the open dialog.
+- **Transfer progress must paint before the browser takes over.** Export yields a rendered
+  status frame before clicking its download link. Import keeps the file-picker click in the
+  original user gesture, then announces and exposes `aria-busy` while reading the selected
+  file. Disable both transfer buttons during either operation so their busy states cannot race.
 
 ## Feedback traps
 

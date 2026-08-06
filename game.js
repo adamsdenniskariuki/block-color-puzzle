@@ -90,7 +90,7 @@
 
   const COLS = 5;                   // one column per colour
   const APP_VERSION = '1.0.0';
-  const BUILD_ID = 'bcp-v32';       // must match CACHE in sw.js
+  const BUILD_ID = 'bcp-v33';       // must match CACHE in sw.js
   const FEEDBACK_EMAIL = 'sortilefeedback@gmail.com';
   const STORAGE_KEY = 'bcp.v1';
   const EXPORT_FORMAT = 'sortile-settings-and-stats';
@@ -139,6 +139,8 @@
     levelsSummary: document.getElementById('levels-summary'),
     help:     document.getElementById('help'),
     settings: document.getElementById('settings'),
+    dataBackup: document.getElementById('data-backup'),
+    dataBackupTitle: document.getElementById('data-backup-title'),
     feedback: document.getElementById('feedback'),
     feedbackTitle: document.getElementById('feedback-title'),
     feedbackPuzzleRow: document.getElementById('feedback-puzzle-row'),
@@ -152,6 +154,8 @@
     confirmImport: document.getElementById('confirm-import'),
     importSummary: document.getElementById('import-summary'),
     importFile: document.getElementById('import-file'),
+    exportData: document.getElementById('btn-export-data'),
+    importData: document.getElementById('btn-import-data'),
     dataStatus: document.getElementById('data-status'),
     stats:    document.getElementById('stats'),
     statsGrid: document.getElementById('stats-grid'),
@@ -605,8 +609,22 @@
     el.dataStatus.classList.toggle('is-error', error);
   }
 
-  function exportDataFile() {
+  function setDataBusy(busy) {
+    el.exportData.disabled = busy;
+    el.importData.disabled = busy;
+    if (busy) el.dataBackup.setAttribute('aria-busy', 'true');
+    else el.dataBackup.removeAttribute('aria-busy');
+  }
+
+  function afterDataStatusPaint() {
+    return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  }
+
+  async function exportDataFile() {
+    setDataBusy(true);
+    showDataStatus('Preparing export...');
     try {
+      await afterDataStatusPaint();
       const data = buildExportData();
       const text = JSON.stringify(data, null, 2) + '\n';
       const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
@@ -620,6 +638,8 @@
       showDataStatus('Export ready.');
     } catch (error) {
       showDataStatus(error.message || 'Sortile could not create the export file.', true);
+    } finally {
+      setDataBusy(false);
     }
   }
 
@@ -630,11 +650,15 @@
       pendingImport = parseImportText(text);
       el.importSummary.textContent = 'Exported ' +
         new Date(pendingImport.exportedAt).toLocaleString() + '.';
-      el.settings.hidden = false;
+      el.settings.hidden = true;
+      el.dataBackup.hidden = true;
       el.confirmImport.hidden = false;
+      document.getElementById('confirm-import-title').focus();
       return true;
     } catch (error) {
       pendingImport = null;
+      el.settings.hidden = true;
+      el.dataBackup.hidden = false;
       showDataStatus(error.message, true);
       return false;
     }
@@ -643,7 +667,9 @@
   function cancelImport() {
     pendingImport = null;
     el.confirmImport.hidden = true;
-    el.settings.hidden = false;
+    el.settings.hidden = true;
+    el.dataBackup.hidden = false;
+    document.getElementById('btn-import-data').focus();
   }
 
   function applyImportedPreferences(data) {
@@ -669,17 +695,21 @@
       replaceImportedData(pendingImport);
     } catch (error) {
       el.confirmImport.hidden = true;
-      el.settings.hidden = false;
+      el.settings.hidden = true;
+      el.dataBackup.hidden = false;
       showDataStatus(error.message, true);
+      document.getElementById('btn-import-data').focus();
       return false;
     }
     const data = pendingImport;
     pendingImport = null;
     el.confirmImport.hidden = true;
-    el.settings.hidden = false;
+    el.settings.hidden = true;
+    el.dataBackup.hidden = false;
     applyImportedPreferences(data);
     syncModeUi();
     showDataStatus('Imported. Difficulty applies to your next Free play board.');
+    document.getElementById('btn-import-data').focus();
     return true;
   }
 
@@ -1639,8 +1669,8 @@
     }
   }
 
-  function trapFeedbackTab(e) {
-    const focusable = [...el.feedback.querySelectorAll(
+  function trapModalTab(modal, e) {
+    const focusable = [...modal.querySelectorAll(
       'a[href], button:not([disabled]), input:not([disabled]), summary, textarea'
     )].filter(node => !node.closest('[hidden]') &&
       !(node.tagName !== 'SUMMARY' && node.closest('details:not([open])')));
@@ -2129,8 +2159,27 @@
   });
   el.feedback.addEventListener('click', e => { if (e.target === el.feedback) closeFeedback(); });
 
-  document.getElementById('btn-export-data').addEventListener('click', exportDataFile);
-  document.getElementById('btn-import-data').addEventListener('click', () => { el.importFile.click(); });
+  function openDataBackup() {
+    showDataStatus('');
+    el.settings.hidden = true;
+    el.dataBackup.hidden = false;
+    el.dataBackupTitle.focus();
+  }
+
+  function closeDataBackup() {
+    el.dataBackup.hidden = true;
+    el.settings.hidden = false;
+    document.getElementById('btn-data-backup').focus();
+  }
+
+  document.getElementById('btn-data-backup').addEventListener('click', openDataBackup);
+  document.getElementById('btn-data-backup-back').addEventListener('click', closeDataBackup);
+  el.dataBackup.addEventListener('click', e => { if (e.target === el.dataBackup) closeDataBackup(); });
+  el.exportData.addEventListener('click', exportDataFile);
+  el.importData.addEventListener('click', () => {
+    showDataStatus('Choose a Sortile export file.');
+    el.importFile.click();
+  });
   el.importFile.addEventListener('change', async () => {
     const file = el.importFile.files && el.importFile.files[0];
     el.importFile.value = '';
@@ -2139,8 +2188,15 @@
       showDataStatus('The import file is too large.', true);
       return;
     }
-    try { stageImportText(await file.text()); }
-    catch { showDataStatus('Sortile could not read the selected file.', true); }
+    setDataBusy(true);
+    showDataStatus('Checking import...');
+    try {
+      stageImportText(await file.text());
+    } catch {
+      showDataStatus('Sortile could not read the selected file.', true);
+    } finally {
+      setDataBusy(false);
+    }
   });
   document.getElementById('btn-confirm-import').addEventListener('click', confirmImport);
   document.getElementById('btn-import-cancel').addEventListener('click', cancelImport);
@@ -2157,6 +2213,7 @@
   document.addEventListener('keydown', e => {
     const openModal = !el.feedback.hidden ? el.feedback
       : !el.confirmImport.hidden ? el.confirmImport
+      : !el.dataBackup.hidden ? el.dataBackup
       : !el.confirmNew.hidden ? el.confirmNew
       : !el.levels.hidden ? el.levels
       : !el.stats.hidden ? el.stats
@@ -2167,10 +2224,12 @@
       if (e.key === 'Escape') {
         if (openModal === el.feedback) closeFeedback();
         else if (openModal === el.confirmImport) cancelImport();
+        else if (openModal === el.dataBackup) closeDataBackup();
         else openModal.hidden = true;
         e.preventDefault();
-      } else if (openModal === el.feedback && e.key === 'Tab') {
-        trapFeedbackTab(e);
+      } else if ((openModal === el.feedback || openModal === el.dataBackup ||
+                  openModal === el.confirmImport) && e.key === 'Tab') {
+        trapModalTab(openModal, e);
       }
       return;
     }
