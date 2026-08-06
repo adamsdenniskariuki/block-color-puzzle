@@ -463,6 +463,32 @@ Install naming is intentionally redundant: manifest `name` / `short_name`, HTML
 updates a matching installed app's manifest metadata on its own schedule; iOS home-screen
 labels generally require remove/re-add. Icon PNGs contain no embedded text metadata.
 
+### Renaming the app again
+
+Treat a rename as a coordinated release, not a string replacement:
+
+1. **Never change `id`, `start_url`, `scope`, `STORAGE_KEY`, or `EXPORT_FORMAT`.** Identity
+   and persisted-format identifiers are not branding. Keeping `/block-color-puzzle/index.html`,
+   `./index.html`, `./`, `bcp.v1`, and `sortile-settings-and-stats` lets existing installs,
+   preferences and exported files keep working. The `bcp-vN` cache prefix can stay too; only
+   increment `N`.
+2. Update every name source together: manifest `name` and `short_name`; HTML `<title>`,
+   `application-name`, and `apple-mobile-web-app-title`; the visible `<h1>`; share/export
+   labels and error copy in `game.js`; README title and install copy; and comments only where
+   they describe user-visible branding.
+3. Search the whole repo for the old full and short names. Regenerate branded store images
+   and poster art with `tools/make-store-assets.js` if the old name appears in pixels, and
+   update the separately managed Microsoft Store / Partner Center listing and generated
+   PWABuilder display-name metadata without changing the Store package identity.
+4. Keep exact assertions for the manifest and HTML naming surfaces, update other name-pinned
+   tests, and mutation-verify every new test. Bump `sw.js` because both `index.html` and the
+   manifest are cached assets.
+5. After deployment, verify the exact Pages SHA, live manifest MIME/content, HTML metas, and
+   new cache id. Chromium desktop can take about 24 hours and all app windows closing to
+   rename a matching install; Android can additionally wait for Wi-Fi and charging. iOS and
+   iPadOS users should remove and re-add the home-screen app. If an install has a mismatched
+   historical identity, it must be uninstalled and reinstalled.
+
 ## PowerShell
 
 - No heredoc. For multi-line strings use a here-string: `@'` on its own line, content,
