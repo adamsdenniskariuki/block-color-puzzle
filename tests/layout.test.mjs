@@ -343,12 +343,24 @@ test('the mode row keeps a stable phone budget and the board caps on tablets', a
   await page.waitForFunction(() => window.__bcp.state.mode === 'levels');
   await settle(page);
   const levels = await measure(page);
+  const levelNoteSpacing = await page.evaluate(() => {
+    const wrapper = document.querySelector('#mode-note > .mode-note-text');
+    if (!wrapper) return { wrapped: false, leadingSpaceWidth: 0 };
+    const text = wrapper.childNodes[1];
+    if (!text || text.nodeType !== Node.TEXT_NODE) return { wrapped: true, leadingSpaceWidth: 0 };
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 1);
+    return { wrapped: true, leadingSpaceWidth: range.getBoundingClientRect().width };
+  });
 
   assert.equal(daily.modeNote.height, free.modeNote.height, 'the note reserves its height in free play');
   assert.equal(levels.modeNote.height, free.modeNote.height, 'the note height is stable in levels');
   assert.equal(daily.stage.top, free.stage.top, 'daily should not move the board down');
   assert.equal(levels.stage.top, free.stage.top, 'levels should not move the board down');
   assert.equal(daily.cell, free.cell, 'same-sized free and daily boards share one stable budget');
+  assert.equal(levelNoteSpacing.wrapped, true, 'rich mode status should remain one flex item');
+  assert.ok(levelNoteSpacing.leadingSpaceWidth > 0, 'Level status should keep space after its bold label');
 
   await page.setViewportSize({ width: 768, height: 1024 });
   await page.locator('.seg-mode [data-mode="free"]').click();

@@ -911,6 +911,8 @@ test('mode and board actions are placed on the main screen in task order', async
   assert.equal(h.$('.mode-row').contains(h.$('#btn-new')), true, 'New board sits beside the mode control');
   assert.equal(h.$('.mode-panel').contains(h.$('.seg-mode')), true, 'mode is on the main screen');
   assert.equal(h.$('#settings').contains(h.$('.seg-mode')), false, 'settings no longer owns mode');
+  assert.deepEqual(h.$$('.seg-mode .seg-btn').map(btn => btn.dataset.mode),
+    ['daily', 'levels', 'free'], 'mode tabs should follow the chosen Daily, Levels, Free play order');
   assert.equal(h.$('#btn-more'), null, 'the board menu trigger is removed');
   assert.equal(h.$('#more'), null, 'the board menu itself is removed');
 

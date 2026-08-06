@@ -1401,7 +1401,7 @@
       const bits = ['<strong>Daily</strong> \u00b7 ' + state.dailyKey];
       if (done) bits.push('solved in ' + formatTime(done.ms));
       if (daily.streak) bits.push('streak ' + daily.streak);
-      el.modeNote.innerHTML = bits.join(' \u00b7 ');
+      el.modeNote.innerHTML = '<span class="mode-note-text">' + bits.join(' \u00b7 ') + '</span>';
       return;
     }
 
@@ -1410,7 +1410,7 @@
       const bits = ['<strong>Level ' + state.level + '</strong> of ' + LEVEL_COUNT,
         'par ' + state.par + ' moves'];
       if (best) bits.push(starMarkup(best.stars) + ' best ' + best.moves);
-      el.modeNote.innerHTML = bits.join(' \u00b7 ');
+      el.modeNote.innerHTML = '<span class="mode-note-text">' + bits.join(' \u00b7 ') + '</span>';
       return;
     }
 

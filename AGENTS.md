@@ -315,6 +315,11 @@ consecutive frames match before recording. That is safe because a real bleed is 
   is hidden in Daily.
 - **`#mode-note` always owns its line.** Empty Free-play copy must not collapse the element,
   or changing modes changes `verticalBudget()` and makes the board jump.
+- **Rich mode notes need one `.mode-note-text` flex child.** Assigning `<strong>` and text
+  directly to the flex container turns each fragment into a separate flex item and trims the
+  whitespace between "Level 6" and "of 24" (and around stars). The wrapper restores normal
+  inline spacing without changing the reserved height. The tab order is intentionally Daily,
+  Levels, Free play.
 - **Board sizing starts from the space left after the mode row and reserved note.** Phones
   grow into that budget; the 78px cell cap keeps tablets from turning into a wall of tiles.
   Do not add mode-specific height arithmetic.

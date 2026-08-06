@@ -501,6 +501,7 @@ body {
   line-height: 1.25;
   color: var(--text-dim);
 }
+.mode-note-text { max-width: 100%; }
 .mode-note strong { color: var(--accent); font-weight: 600; }
 
 /* ---------- controls ---------- */

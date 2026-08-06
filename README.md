@@ -105,7 +105,7 @@ means the same column no matter which palette you pick. Both choices persist.
 
 ## Controls
 
-Mode sits above the HUD so **Free play**, **Daily** and **Levels** are always one
+Mode sits above the HUD so **Daily**, **Levels** and **Free play** are always one
 tap away. **New board** sits beside it in Free play, becomes **Choose level** in
 Levels, and disappears in Daily because that puzzle cannot be rerolled.
 
