@@ -290,10 +290,21 @@ test('the narrowest landscape phone still uses two columns', async (t) => {
 // The manifest must not lock orientation. "portrait" is respected by installed
 // PWAs, which would make the landscape layout unreachable for the users most
 // likely to need it.
-test('the manifest does not lock the app to portrait', async () => {
+test('install metadata preserves the original app identity under the Sortile name', async () => {
   const response = await fetch(`${server.url}/manifest.webmanifest`);
   assert.equal(response.status, 200, 'manifest should be served');
   const manifest = await response.json();
+
+  const productionManifest = new URL(
+    'https://adamsdenniskariuki.github.io/block-color-puzzle/manifest.webmanifest'
+  );
+  const resolvedStart = new URL(manifest.start_url, productionManifest);
+  const resolvedId = new URL(manifest.id, resolvedStart.origin);
+  assert.equal(resolvedId.href, resolvedStart.href,
+    'the explicit id must match the implicit start_url identity used by the first release');
+  assert.equal(manifest.name, 'Sortile \u2014 Colour Block Puzzle');
+  assert.equal(manifest.short_name, 'Sortile');
+  assert.equal(manifest.scope, './');
 
   assert.notEqual(manifest.orientation, 'portrait',
     'locking portrait would make the landscape layout unreachable once installed');
@@ -302,6 +313,25 @@ test('the manifest does not lock the app to portrait', async () => {
     'a maskable icon is required for a clean installed icon');
   assert.ok(manifest.icons.some((i) => i.sizes === '512x512'),
     'store packaging tools require a 512px icon');
+
+  const context = await browser.newContext();
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  await page.goto(`${server.url}/index.html`);
+  const head = await page.evaluate(() => ({
+    title: document.title,
+    manifest: document.querySelector('link[rel="manifest"]')?.getAttribute('href'),
+    applicationName: document.querySelector('meta[name="application-name"]')?.content,
+    appleTitle: document.querySelector('meta[name="apple-mobile-web-app-title"]')?.content
+  }));
+  assert.deepEqual(head, {
+    title: 'Sortile \u2014 Colour Block Puzzle',
+    manifest: 'manifest.webmanifest',
+    applicationName: 'Sortile',
+    appleTitle: 'Sortile'
+  });
+  await context.close();
 });
 
 test('portrait keeps the stacked layout', async () => {

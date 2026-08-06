@@ -452,6 +452,17 @@ The action row and the board menu use an inline `<symbol>` sprite at the top of
 makes the entire landscape layout unreachable for the users most likely to want it.
 There is a test guarding this.
 
+The PWA `id` must stay `/block-color-puzzle/index.html`. The first release had no explicit
+`id`, so browsers derived that exact identity from `start_url: "./index.html"`. Adding
+`/block-color-puzzle/` later did not tidy the identity — it created a different app, leaving
+the original installed **Block Puzzle** outside subsequent Sortile manifest updates. Never
+change an app id after release without an explicit migration plan.
+
+Install naming is intentionally redundant: manifest `name` / `short_name`, HTML
+`application-name`, `apple-mobile-web-app-title`, and `<title>` all say Sortile. Chromium
+updates a matching installed app's manifest metadata on its own schedule; iOS home-screen
+labels generally require remove/re-add. Icon PNGs contain no embedded text metadata.
+
 ## PowerShell
 
 - No heredoc. For multi-line strings use a here-string: `@'` on its own line, content,

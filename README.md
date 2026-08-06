@@ -188,6 +188,12 @@ works with no connection.
 
 To install from your own copy, serve the folder over HTTPS (or a tunnel) and do the same.
 
+An original **Block Puzzle** install in Chrome, Edge or Android should rename itself to
+**Sortile** after the browser refreshes the manifest; close every app window and allow up to
+24 hours. Android may also wait for Wi-Fi and charging. If it was installed during the brief
+period when the manifest used the wrong app identity, uninstall and reinstall once. iPhone
+and iPad home-screen labels do not reliably refresh, so remove the old icon and add it again.
+
 ## Tests
 
 The suite boots the real shipped files inside jsdom and drives them the way a player would,
