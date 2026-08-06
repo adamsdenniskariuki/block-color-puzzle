@@ -89,6 +89,9 @@
   const APPEARANCE_ALIASES = { sand: 'amber' };
 
   const COLS = 5;                   // one column per colour
+  const APP_VERSION = '1.0.0';
+  const BUILD_ID = 'bcp-v32';       // must match CACHE in sw.js
+  const FEEDBACK_EMAIL = 'sortilefeedback@gmail.com';
   const STORAGE_KEY = 'bcp.v1';
   const EXPORT_FORMAT = 'sortile-settings-and-stats';
   const EXPORT_VERSION = 1;
@@ -136,6 +139,15 @@
     levelsSummary: document.getElementById('levels-summary'),
     help:     document.getElementById('help'),
     settings: document.getElementById('settings'),
+    feedback: document.getElementById('feedback'),
+    feedbackTitle: document.getElementById('feedback-title'),
+    feedbackPuzzleRow: document.getElementById('feedback-puzzle-row'),
+    feedbackPuzzle: document.getElementById('feedback-puzzle'),
+    feedbackPuzzleNote: document.getElementById('feedback-puzzle-note'),
+    feedbackPreview: document.getElementById('feedback-preview'),
+    feedbackText: document.getElementById('feedback-text'),
+    feedbackStatus: document.getElementById('feedback-status'),
+    feedbackSend: document.getElementById('btn-send-feedback'),
     confirmNew: document.getElementById('confirm-new'),
     confirmImport: document.getElementById('confirm-import'),
     importSummary: document.getElementById('import-summary'),
@@ -618,7 +630,7 @@
       pendingImport = parseImportText(text);
       el.importSummary.textContent = 'Exported ' +
         new Date(pendingImport.exportedAt).toLocaleString() + '.';
-      el.settings.hidden = true;
+      el.settings.hidden = false;
       el.confirmImport.hidden = false;
       return true;
     } catch (error) {
@@ -1502,6 +1514,148 @@
     }
   }
 
+  /* ---------------- feedback ---------------- */
+
+  function difficultyLabel(rows = state.rows) {
+    return ({ 4: 'Easy', 5: 'Normal', 6: 'Hard' })[rows] || `${rows} rows`;
+  }
+
+  function deviceLabel(width = window.innerWidth) {
+    if (width < 600) return 'Phone';
+    if (width < 1024) return 'Tablet';
+    return 'Desktop';
+  }
+
+  function browserLabel(userAgent = navigator.userAgent) {
+    const checks = [
+      ['Edge', /\bEdg\/(\d+)/],
+      ['Firefox', /\bFirefox\/(\d+)/],
+      ['Chrome', /\b(?:Chrome|CriOS)\/(\d+)/],
+      ['Safari', /\bVersion\/(\d+).*\bSafari\//]
+    ];
+    for (const [name, pattern] of checks) {
+      const match = userAgent.match(pattern);
+      if (match) return `${name} ${match[1]}`;
+    }
+    return 'Other';
+  }
+
+  function feedbackPuzzleId() {
+    if (state.mode === 'daily' && state.dailyKey) return `daily:${state.dailyKey}`;
+    if (state.mode === 'levels') return `level:${String(state.level).padStart(2, '0')}`;
+    return null;
+  }
+
+  function feedbackDiagnostics(includePuzzle = false) {
+    const diagnostics = {
+      appVersion: APP_VERSION,
+      buildId: BUILD_ID,
+      mode: ({ free: 'Free play', daily: 'Daily', levels: 'Levels' })[state.mode],
+      difficulty: `${difficultyLabel()} (${state.rows} rows)`,
+      device: deviceLabel(),
+      browser: browserLabel()
+    };
+    const puzzleId = includePuzzle ? feedbackPuzzleId() : null;
+    if (puzzleId) diagnostics.puzzleId = puzzleId;
+    return diagnostics;
+  }
+
+  function buildFeedbackText(includePuzzle = false) {
+    const d = feedbackDiagnostics(includePuzzle);
+    const lines = [
+      'Sortile feedback',
+      '',
+      'What happened, or what would you like to suggest?',
+      '[Write your feedback here]',
+      '',
+      'Steps to reproduce (if relevant):',
+      '1.',
+      '2.',
+      '',
+      '---',
+      'Diagnostics included automatically',
+      `App: Sortile ${d.appVersion}`,
+      `Build: ${d.buildId}`,
+      `Mode: ${d.mode}`,
+      `Difficulty: ${d.difficulty}`,
+      `Device: ${d.device}`,
+      `Browser: ${d.browser}`
+    ];
+    if (d.puzzleId) lines.push(`Puzzle: ${d.puzzleId}`);
+    return lines.join('\n');
+  }
+
+  function updateFeedbackDraft() {
+    const text = buildFeedbackText(el.feedbackPuzzle.checked);
+    el.feedbackText.value = text;
+    el.feedbackSend.href = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent('Sortile feedback')}` +
+      `&body=${encodeURIComponent(text)}`;
+    return text;
+  }
+
+  function showFeedbackStatus(message) {
+    el.feedbackStatus.textContent = message;
+  }
+
+  let feedbackReturnFocus = null;
+
+  function openFeedback() {
+    feedbackReturnFocus = document.getElementById('btn-feedback');
+    const puzzleId = feedbackPuzzleId();
+    el.feedbackPuzzle.checked = false;
+    el.feedbackPuzzleRow.hidden = !puzzleId;
+    el.feedbackPuzzleNote.textContent = puzzleId ? `Adds ${puzzleId}` : '';
+    el.feedbackPreview.open = false;
+    showFeedbackStatus('');
+    updateFeedbackDraft();
+    el.settings.hidden = true;
+    el.feedback.hidden = false;
+    el.feedbackTitle.focus();
+  }
+
+  function closeFeedback() {
+    el.feedback.hidden = true;
+    el.settings.hidden = false;
+    const target = feedbackReturnFocus || document.getElementById('btn-feedback');
+    feedbackReturnFocus = null;
+    target.focus();
+  }
+
+  function revealManualFeedback(message) {
+    el.feedbackPreview.open = true;
+    showFeedbackStatus(message);
+    el.feedbackText.focus();
+    el.feedbackText.select();
+  }
+
+  async function copyFeedbackText() {
+    const text = updateFeedbackDraft();
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error('clipboard unavailable');
+      await navigator.clipboard.writeText(text);
+      showFeedbackStatus('Feedback text copied. Paste it into any email app.');
+    } catch {
+      revealManualFeedback('Copy was blocked. Select and copy the text below manually.');
+    }
+  }
+
+  function trapFeedbackTab(e) {
+    const focusable = [...el.feedback.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), summary, textarea'
+    )].filter(node => !node.closest('[hidden]') &&
+      !(node.tagName !== 'SUMMARY' && node.closest('details:not([open])')));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      last.focus();
+      e.preventDefault();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      first.focus();
+      e.preventDefault();
+    }
+  }
+
   /* ---------------- lifecycle ---------------- */
 
   function newGame() {
@@ -1957,10 +2111,23 @@
 
   document.getElementById('btn-settings').addEventListener('click', () => {
     syncModeUi();
+    const scroller = el.settings.querySelector('.modal-scroll');
+    if (scroller) scroller.scrollTop = 0;
     el.settings.hidden = false;
   });
   document.getElementById('btn-settings-close').addEventListener('click', () => { el.settings.hidden = true; });
   el.settings.addEventListener('click', e => { if (e.target === el.settings) el.settings.hidden = true; });
+
+  document.getElementById('btn-feedback').addEventListener('click', openFeedback);
+  document.getElementById('btn-feedback-back').addEventListener('click', closeFeedback);
+  document.getElementById('btn-copy-feedback').addEventListener('click', copyFeedbackText);
+  el.feedbackPuzzle.addEventListener('change', updateFeedbackDraft);
+  el.feedbackSend.addEventListener('click', () => {
+    updateFeedbackDraft();
+    el.feedbackPreview.open = true;
+    showFeedbackStatus('If your email app did not open, copy the text below and email it to ' + FEEDBACK_EMAIL + '.');
+  });
+  el.feedback.addEventListener('click', e => { if (e.target === el.feedback) closeFeedback(); });
 
   document.getElementById('btn-export-data').addEventListener('click', exportDataFile);
   document.getElementById('btn-import-data').addEventListener('click', () => { el.importFile.click(); });
@@ -1988,7 +2155,8 @@
 
   // Arrow keys push a block in the pressed direction, into the gap.
   document.addEventListener('keydown', e => {
-    const openModal = !el.confirmImport.hidden ? el.confirmImport
+    const openModal = !el.feedback.hidden ? el.feedback
+      : !el.confirmImport.hidden ? el.confirmImport
       : !el.confirmNew.hidden ? el.confirmNew
       : !el.levels.hidden ? el.levels
       : !el.stats.hidden ? el.stats
@@ -1997,9 +2165,12 @@
     if (openModal) {
       // A modal owns the keyboard while it is up, so the board must not move.
       if (e.key === 'Escape') {
-        if (openModal === el.confirmImport) cancelImport();
+        if (openModal === el.feedback) closeFeedback();
+        else if (openModal === el.confirmImport) cancelImport();
         else openModal.hidden = true;
         e.preventDefault();
+      } else if (openModal === el.feedback && e.key === 'Tab') {
+        trapFeedbackTab(e);
       }
       return;
     }
@@ -2159,6 +2330,8 @@
       replaceImportedData, stageImportText, confirmImport, EXPORT_FORMAT, EXPORT_VERSION,
       seedFrom, mulberry32, shuffled, neighbours, buildSolved, scramble,
       renderBoard, renderGuide, layout,
+      feedbackDiagnostics, buildFeedbackText, feedbackPuzzleId, browserLabel, deviceLabel,
+      APP_VERSION, BUILD_ID, FEEDBACK_EMAIL,
       undo, applySwipe, syncHintButton, COLS, STORAGE_KEY, SCRAMBLE_PER_CELL
     };
   }

@@ -1012,3 +1012,80 @@ test('settings swatch labels stay inside their cards', async (t) => {
 
   await context.close();
 });
+
+test('Settings scrolls behind a fixed reachable Done footer on phones', async (t) => {
+  const context = await browser.newContext();
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+
+  for (const vp of [{ name: 'iPhone SE', width: 320, height: 568 },
+                    { name: 'iPhone 14', width: 390, height: 844 }]) {
+    await t.test(vp.name, async () => {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.goto(`${server.url}/index.html`);
+      await page.waitForFunction(() => Boolean(window.__bcp));
+      await page.click('#btn-settings');
+      await settle(page);
+
+      const result = await page.evaluate(() => {
+        const card = document.querySelector('#settings .modal-card');
+        const body = document.querySelector('#settings .modal-scroll');
+        const foot = document.querySelector('#settings .modal-foot');
+        const done = document.getElementById('btn-settings-close');
+        const before = foot.getBoundingClientRect();
+        body.scrollTop = body.scrollHeight;
+        const after = foot.getBoundingClientRect();
+        const cardRect = card.getBoundingClientRect();
+        const doneRect = done.getBoundingClientRect();
+        return {
+          scrolled: body.scrollTop,
+          footBefore: before.top,
+          footAfter: after.top,
+          cardBottom: cardRect.bottom,
+          doneBottom: doneRect.bottom
+        };
+      });
+
+      assert.ok(result.scrolled > 0, 'Settings body should have independent scroll room');
+      assert.equal(result.footAfter, result.footBefore, 'footer must not move when the body scrolls');
+      assert.ok(result.doneBottom <= result.cardBottom + SLACK, 'Done must stay inside the visible card');
+    });
+  }
+
+  await context.close();
+});
+
+test('feedback preflight keeps its actions usable at 390x844', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  await page.goto(`${server.url}/index.html`);
+  await page.waitForFunction(() => Boolean(window.__bcp));
+  await page.click('#btn-settings');
+  await page.click('#btn-feedback');
+  await settle(page);
+
+  const m = await page.evaluate(() => {
+    const card = document.querySelector('#feedback .modal-card');
+    const send = document.getElementById('btn-send-feedback');
+    const back = document.getElementById('btn-feedback-back');
+    const cardRect = card.getBoundingClientRect();
+    return {
+      overflow: card.scrollHeight - card.clientHeight,
+      cardTop: cardRect.top,
+      cardBottom: cardRect.bottom,
+      sendTop: send.getBoundingClientRect().top,
+      backBottom: back.getBoundingClientRect().bottom,
+      previewOpen: document.getElementById('feedback-preview').open
+    };
+  });
+
+  assert.ok(m.overflow <= SLACK, `collapsed feedback dialog should fit without scrolling, overflowed by ${m.overflow}px`);
+  assert.ok(m.sendTop >= m.cardTop - SLACK && m.backBottom <= m.cardBottom + SLACK,
+    'all feedback actions must be visible and touchable');
+  assert.equal(m.previewOpen, false, 'preview should preserve space by starting collapsed');
+
+  await context.close();
+});

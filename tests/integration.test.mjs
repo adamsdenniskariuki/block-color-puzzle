@@ -10,6 +10,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { boot, autoSolve } from './helpers/boot.mjs';
 
 /** A fresh game per test, so no test can be polluted by an earlier one. */
@@ -356,6 +357,174 @@ test('the settings sheet opens, toggles persist, and it closes', async () => {
   h.click('#btn-settings-close');
   await h.tick();
   assert.equal(sheet.hidden, true);
+
+  h.close();
+});
+
+test('feedback build metadata matches the package and service-worker cache', async () => {
+  const h = await fresh();
+  const packageData = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const sw = fs.readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+  const cache = sw.match(/const CACHE = '([^']+)'/);
+
+  assert.equal(h.bcp.APP_VERSION, packageData.version);
+  assert.ok(cache, 'service worker cache constant should be readable');
+  assert.equal(h.bcp.BUILD_ID, cache[1]);
+
+  h.close();
+});
+
+test('feedback diagnostics expose only the approved fields and opt-in seeded puzzle ID', async () => {
+  const h = await fresh({ width: 390 });
+  const { state } = h.bcp;
+  state.moves = 98765;
+  state.elapsed = 87654;
+  state.palette = 'candy';
+  h.win.localStorage.setItem('private-test-value', 'must-not-leak');
+  Object.defineProperty(h.win.navigator, 'userAgent', {
+    configurable: true,
+    value: 'SECRET-RAW-UA Chrome/139.0.0.0 Safari/537.36'
+  });
+
+  assert.deepEqual(Object.keys(h.bcp.feedbackDiagnostics()).sort(),
+    ['appVersion', 'browser', 'buildId', 'device', 'difficulty', 'mode']);
+  assert.equal(h.bcp.feedbackDiagnostics().device, 'Phone');
+  assert.equal(h.bcp.browserLabel('Mozilla/5.0 Chrome/139.0.0.0 Safari/537.36'), 'Chrome 139');
+
+  h.bcp.setMode('daily');
+  const dailyWithoutId = h.bcp.buildFeedbackText(false);
+  const dailyWithId = h.bcp.buildFeedbackText(true);
+  assert.ok(!dailyWithoutId.includes('Puzzle:'), 'puzzle ID must be opt-in');
+  assert.ok(dailyWithId.includes(`Puzzle: daily:${state.dailyKey}`));
+
+  h.bcp.setMode('levels');
+  h.bcp.playLevel(6);
+  assert.ok(h.bcp.buildFeedbackText(true).includes('Puzzle: level:06'));
+
+  h.bcp.setMode('free');
+  const free = h.bcp.buildFeedbackText(true);
+  assert.ok(!free.includes('Puzzle:'), 'free play must never invent an ID');
+  for (const forbidden of ['98765', '87654', 'candy', 'must-not-leak', 'SECRET-RAW-UA',
+                           'Board:', 'Moves:', 'Timing:', 'Hints:']) {
+    assert.ok(!free.includes(forbidden), `feedback leaked ${forbidden}`);
+  }
+
+  h.close();
+});
+
+test('feedback preflight hides Settings and restores it with focus on every close path', async () => {
+  const h = await fresh();
+  const open = async () => {
+    h.click('#btn-settings');
+    h.$('#btn-feedback').focus();
+    h.click('#btn-feedback');
+    await h.tick(2);
+    assert.equal(h.$('#settings').hidden, true);
+    assert.equal(h.$('#feedback').hidden, false);
+    assert.equal(h.doc.activeElement, h.$('#feedback-title'));
+    assert.equal(h.$('#feedback-preview').open, false, 'preview starts collapsed');
+    h.$('#btn-feedback-back').focus();
+    h.key('Tab');
+    assert.equal(h.doc.activeElement, h.$('.feedback-address a'), 'Tab wraps inside the dialog');
+  };
+
+  await open();
+  h.click('#btn-feedback-back');
+  await h.tick(2);
+  assert.equal(h.$('#feedback').hidden, true);
+  assert.equal(h.$('#settings').hidden, false);
+  assert.equal(h.doc.activeElement, h.$('#btn-feedback'));
+
+  await open();
+  h.key('Escape');
+  await h.tick(2);
+  assert.equal(h.$('#settings').hidden, false);
+  assert.equal(h.doc.activeElement, h.$('#btn-feedback'));
+
+  await open();
+  h.click('#feedback');
+  await h.tick(2);
+  assert.equal(h.$('#settings').hidden, false);
+  assert.equal(h.doc.activeElement, h.$('#btn-feedback'));
+
+  h.close();
+});
+
+test('the puzzle-ID choice appears unchecked only for Daily and Levels', async () => {
+  const h = await fresh();
+
+  for (const mode of ['daily', 'levels', 'free']) {
+    h.bcp.setMode(mode);
+    h.click('#btn-settings');
+    h.click('#btn-feedback');
+    await h.tick();
+
+    assert.equal(h.$('#feedback-puzzle-row').hidden, mode === 'free',
+      `${mode} puzzle-ID visibility is wrong`);
+    assert.equal(h.$('#feedback-puzzle').checked, false, 'the choice must start unchecked');
+
+    h.click('#btn-feedback-back');
+  }
+
+  h.close();
+});
+
+test('feedback email and copy actions use the same complete scaffold', async () => {
+  const h = await fresh();
+  let copied = '';
+  Object.defineProperty(h.win.navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: async text => { copied = text; } }
+  });
+  Object.defineProperty(h.win.navigator, 'onLine', { configurable: true, value: false });
+
+  h.click('#btn-settings');
+  h.click('#btn-feedback');
+  await h.tick(2);
+
+  const text = h.$('#feedback-text').value;
+  const mail = new URL(h.$('#btn-send-feedback').href);
+  assert.equal(mail.protocol, 'mailto:');
+  assert.equal(mail.pathname, 'sortilefeedback@gmail.com');
+  assert.equal(mail.searchParams.get('subject'), 'Sortile feedback');
+  assert.equal(mail.searchParams.get('body'), text);
+  assert.ok(text.includes('[Write your feedback here]'));
+  assert.ok(text.includes(`Build: ${h.bcp.BUILD_ID}`));
+
+  h.$('#btn-send-feedback').addEventListener('click', event => event.preventDefault(), { once: true });
+  h.click('#btn-send-feedback');
+  assert.equal(h.$('#feedback-preview').open, true, 'email handoff should expose the manual fallback');
+  assert.ok(h.$('#feedback-status').textContent.includes('sortilefeedback@gmail.com'));
+
+  h.click('#btn-copy-feedback');
+  await h.tick(2);
+  assert.equal(copied, text);
+  assert.match(h.$('#feedback-status').textContent, /copied/i);
+
+  h.close();
+});
+
+test('clipboard failure reveals and selects the readonly manual-copy fallback', async () => {
+  const h = await fresh();
+  Object.defineProperty(h.win.navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: async () => { throw new Error('denied'); } }
+  });
+
+  h.click('#btn-settings');
+  h.click('#btn-feedback');
+  await h.tick(2);
+  h.click('#btn-copy-feedback');
+  await h.tick(2);
+
+  const text = h.$('#feedback-text');
+  assert.equal(h.$('#feedback-preview').open, true);
+  assert.equal(text.readOnly, true);
+  assert.equal(h.doc.activeElement, text);
+  assert.equal(text.selectionStart, 0);
+  assert.equal(text.selectionEnd, text.value.length);
+  assert.match(h.$('#feedback-status').textContent, /manually/i);
+  assert.ok(h.$('.feedback-address').textContent.includes('sortilefeedback@gmail.com'));
 
   h.close();
 });

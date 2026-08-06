@@ -352,6 +352,23 @@ consecutive frames match before recording. That is safe because a real bleed is 
 - **Portable names intentionally differ from legacy storage names.** `fadeUnsorted` maps to
   `hints`, and `vibrate` maps to `haptics`. Keep those translations explicit.
 
+## Feedback traps
+
+- **Diagnostics are an allowlist, not a scrubbed state dump.** Feedback may include only
+  `APP_VERSION`, `BUILD_ID`, mode, difficulty/rows, a coarse device/browser label, and an
+  explicitly opted-in `daily:YYYY-MM-DD` or `level:NN`. Never start from state, storage,
+  the URL or the user agent and remove fields; that eventually leaks something.
+- **Free play has no transferable puzzle ID.** Its board is random and deliberately has no
+  seed, so the optional puzzle control exists only in Daily and Levels and starts unchecked.
+- **Email and clipboard are conveniences, not delivery guarantees.** The complete scaffold
+  always remains in a readonly selectable preview, and clipboard failure opens and selects
+  it. There are no drafts, queues, background sends, analytics or stored feedback.
+- **`BUILD_ID` in `game.js` must equal `CACHE` in `sw.js`.** Tests enforce that link so the
+  identifier attached to feedback names the assets the player actually loaded.
+- **Settings needs the split-card structure.** Adding Feedback made the 390x844 card taller
+  than the viewport; `.modal-scroll` owns scrolling while the sibling `.modal-foot` keeps
+  Done reachable. Do not compress the existing controls to make new rows fit.
+
 ## Resume traps
 
 - **`saveInplay()` hangs off `updateHud()`.** That looks like a layering mistake and is not:

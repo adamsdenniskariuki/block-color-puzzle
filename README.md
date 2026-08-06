@@ -119,6 +119,14 @@ Import validates the whole file first, then asks before replacing the saved
 settings and statistics in one step. The puzzle currently in progress is not
 included in an export and stays open through an import.
 
+The **Feedback** row opens a preflight before launching your email app.
+The prepared message goes to `sortilefeedback@gmail.com` and includes only the
+Sortile version/build, current mode and board size, and a broad device/browser
+description. Daily and Levels can optionally add their non-personal puzzle ID.
+Statistics, saved data, board position, moves, timing and hints are never added.
+If an email app or clipboard is unavailable, the same text stays selectable for
+manual copying.
+
 | Action | How |
 | --- | --- |
 | Slide blocks | Tap/click any block in the empty slot's row or column |
@@ -135,6 +143,7 @@ included in an export and stays open through an import.
 | Colours | ⚙ — Classic / Accessible / Candy / Jewel |
 | Appearance | ⚙ — Dark / Midnight / Slate / Forest / Plum / Amber / Light / Paper |
 | Saved data | ⚙ — export or import settings, statistics and progress |
+| Feedback | ⚙ — prepare an email with a small, privacy-safe diagnostic summary |
 | Fade unsorted | ⚙ toggle — drains the colour from every block that is in the wrong column, so the ones already home are the only colour left on the board |
 | Symbols | ⚙ toggle — adds a shape to each colour for colourblind play |
 | Sound | ⚙ toggle — synthesised slide/bump/win tones, no audio files |

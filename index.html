@@ -155,7 +155,8 @@
 </div>
 
 <div id="settings" class="modal" hidden>
-  <div class="modal-card">
+  <div class="modal-card modal-card-split">
+    <div class="modal-scroll">
     <h2>Settings</h2>
 
     <p class="field-label" id="lbl-diff">Difficulty</p>
@@ -204,7 +205,55 @@
     </div>
     <p id="data-status" class="field-note data-status" role="status" aria-live="polite"></p>
 
-    <button id="btn-settings-close" class="btn primary" type="button">Done</button>
+    <button id="btn-feedback" class="feedback-entry" type="button" aria-haspopup="dialog">
+      <span class="feedback-entry-copy">
+        <span class="feedback-entry-title">Feedback</span>
+        <span class="feedback-entry-note">Report a problem or share an idea</span>
+      </span>
+      <span class="feedback-entry-arrow" aria-hidden="true"></span>
+    </button>
+    </div>
+    <div class="modal-foot">
+      <button id="btn-settings-close" class="btn primary" type="button">Done</button>
+    </div>
+  </div>
+</div>
+
+<div id="feedback" class="modal" role="dialog" aria-modal="true"
+     aria-labelledby="feedback-title" hidden>
+  <div class="modal-card feedback-card">
+    <h2 id="feedback-title" tabindex="-1">Send feedback</h2>
+    <p class="feedback-intro">Sortile can open your email app with a ready-to-edit message.</p>
+    <p class="feedback-address">To: <a href="mailto:sortilefeedback@gmail.com">sortilefeedback@gmail.com</a></p>
+
+    <p class="feedback-includes-title">The message includes only:</p>
+    <ul class="feedback-includes">
+      <li>the app version and build</li>
+      <li>your current mode and board size</li>
+      <li>a broad device and browser description</li>
+    </ul>
+    <p class="feedback-privacy">Sortile never adds statistics, saved data, your board, moves, timing, hints, or personal information.</p>
+
+    <label id="feedback-puzzle-row" class="feedback-puzzle" hidden>
+      <input id="feedback-puzzle" type="checkbox">
+      <span>
+        <strong>Include puzzle ID</strong>
+        <small id="feedback-puzzle-note"></small>
+      </span>
+    </label>
+
+    <details id="feedback-preview" class="feedback-preview">
+      <summary>Preview feedback text</summary>
+      <textarea id="feedback-text" readonly aria-label="Feedback text for manual copying"></textarea>
+    </details>
+
+    <p id="feedback-status" class="field-note feedback-status" role="status" aria-live="polite"></p>
+
+    <div class="menu-list feedback-actions">
+      <a id="btn-send-feedback" class="btn primary" href="mailto:sortilefeedback@gmail.com">Send feedback</a>
+      <button id="btn-copy-feedback" class="btn" type="button">Copy feedback text</button>
+      <button id="btn-feedback-back" class="btn btn-quiet" type="button">Back to Settings</button>
+    </div>
   </div>
 </div>
 
