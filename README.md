@@ -86,7 +86,8 @@ including closing or backgrounding the app. Walking away therefore still adds to
 your moves, time, hints and undos; only the *solved* counters, and the finish
 rate and average built on them, need a completed board.
 
-The settings sheet carries two appearance controls:
+The Settings sheet keeps Difficulty inline and opens separate focused dialogs for
+Colours, Appearance and Options:
 
 - **Colours** — four palettes, each on a different part of the colour wheel so
   switching changes the board rather than just its saturation. `Classic` is the
@@ -105,18 +106,19 @@ means the same column no matter which palette you pick. Both choices persist.
 
 ## Controls
 
-Mode sits above the HUD so **Daily**, **Levels** and **Free play** are always one
+Mode sits above the HUD so **Free play**, **Levels** and **Daily** are always one
 tap away. **New board** sits beside it in Free play, becomes **Choose level** in
 Levels, and disappears in Daily because that puzzle cannot be rerolled.
 
 Four buttons sit under the board — **Undo**, **Hint**, **Restart**, and **⚙**.
-The gear opens a settings sheet holding difficulty, colours, appearance and the
-four set-and-forget toggles.
+The gear opens a compact settings sheet. Difficulty stays inline; Colours,
+Appearance and Options each open a dedicated dialog and return focus to their row.
 
 The **Data & backup** row in Settings opens the export and import tools. Export
 saves preferences, lifetime statistics, daily history and level progress as a
-readable JSON file, with preparation status before the download begins. Import
-shows file-reading and validation progress, validates the whole file first, then
+readable JSON file, with a high-contrast status panel showing preparation before
+the download begins. Import uses the same panel for file-reading, validation,
+success and errors, validates the whole file first, then
 asks before replacing the saved settings and statistics in one step. A failed
 import changes nothing. The puzzle currently in progress is not included in an
 export and stays open through an import.

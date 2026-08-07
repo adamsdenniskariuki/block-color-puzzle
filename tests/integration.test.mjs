@@ -332,7 +332,7 @@ test('the hint the solver gives is a legal, useful move', async () => {
 
 /* ---------------- settings ---------------- */
 
-test('the settings sheet opens, toggles persist, and it closes', async () => {
+test('the settings sheet keeps Difficulty inline and Options persist in their own dialog', async () => {
   const h = await fresh();
   const sheet = h.$('#settings');
 
@@ -340,6 +340,11 @@ test('the settings sheet opens, toggles persist, and it closes', async () => {
   h.click('#btn-settings');
   await h.tick();
   assert.equal(sheet.hidden, false);
+  assert.ok(sheet.contains(h.$('.seg-diff')), 'Difficulty remains inline in Settings');
+  assert.equal(sheet.contains(h.$('#opt-hints')), false, 'Options must not remain inline');
+  h.click('#btn-options');
+  assert.equal(sheet.hidden, true);
+  assert.equal(h.$('#options').hidden, false);
 
   for (const id of ['#opt-hints', '#opt-symbols', '#opt-sound']) {
     const box = h.$(id);
@@ -353,10 +358,60 @@ test('the settings sheet opens, toggles persist, and it closes', async () => {
   const store = h.bcp.loadStore();
   assert.equal(store.sound, h.$('#opt-sound').checked, 'toggles are written to storage');
   assert.equal(store.symbols, h.$('#opt-symbols').checked);
+  const enabled = [
+    h.$('#opt-hints').checked && 'Fade unsorted',
+    h.$('#opt-symbols').checked && 'Symbols',
+    h.$('#opt-sound').checked && 'Sound'
+  ].filter(Boolean);
+  assert.equal(h.$('#options-summary').textContent,
+    enabled.length ? enabled.join(', ') : 'All options off',
+    'the Settings row should summarize the live choices');
 
+  h.click('#btn-options-back');
   h.click('#btn-settings-close');
   await h.tick();
   assert.equal(sheet.hidden, true);
+
+  h.close();
+});
+
+test('Colours, Appearance, and Options own their controls and restore Settings focus on every close path', async () => {
+  const h = await fresh();
+  const dialogs = [
+    ['colours', 'btn-colours', 'btn-colours-back', 'colours-title', '#palette-row', '#palette-row .swatch'],
+    ['appearance', 'btn-appearance', 'btn-appearance-back', 'appearance-title', '#appearance-row', '#appearance-row .swatch'],
+    ['options', 'btn-options', 'btn-options-back', 'options-title', '#opt-hints', '#opt-hints']
+  ];
+
+  for (const [modalId, triggerId, backId, titleId, controlSelector, firstSelector] of dialogs) {
+    const open = () => {
+      h.click('#btn-settings');
+      h.click(`#${triggerId}`);
+      assert.equal(h.$('#settings').hidden, true);
+      assert.equal(h.$(`#${modalId}`).hidden, false);
+      assert.equal(h.doc.activeElement, h.$(`#${titleId}`));
+      assert.ok(h.$(`#${modalId} ${controlSelector}`), `${modalId} should own ${controlSelector}`);
+      assert.equal(h.$(`#settings ${controlSelector}`), null, `${controlSelector} must not remain inline`);
+      h.$(`#${backId}`).focus();
+      h.key('Tab');
+      assert.equal(h.doc.activeElement, h.$(firstSelector), 'Tab wraps inside the dialog');
+    };
+
+    open();
+    h.click(`#${backId}`);
+    assert.equal(h.$('#settings').hidden, false);
+    assert.equal(h.doc.activeElement, h.$(`#${triggerId}`));
+
+    open();
+    h.key('Escape');
+    assert.equal(h.$('#settings').hidden, false);
+    assert.equal(h.doc.activeElement, h.$(`#${triggerId}`));
+
+    open();
+    h.click(`#${modalId}`);
+    assert.equal(h.$('#settings').hidden, false);
+    assert.equal(h.doc.activeElement, h.$(`#${triggerId}`));
+  }
 
   h.close();
 });
@@ -407,6 +462,8 @@ test('export and import announce preparation and expose a busy state', async () 
   h.click('#btn-data-backup');
   h.click('#btn-export-data');
   assert.equal(h.$('#data-status').textContent, 'Preparing export...');
+  assert.equal(h.$('#data-status').dataset.state, 'progress');
+  assert.equal(h.$('#data-status').hidden, false);
   assert.equal(h.$('#data-backup').getAttribute('aria-busy'), 'true');
   assert.equal(h.$('#btn-export-data').disabled, true);
   assert.equal(h.$('#btn-import-data').disabled, true);
@@ -415,6 +472,7 @@ test('export and import announce preparation and expose a busy state', async () 
     label: 'export preparation'
   });
   assert.equal(downloads, 1);
+  assert.equal(h.$('#data-status').dataset.state, 'success');
   assert.equal(h.$('#data-backup').hasAttribute('aria-busy'), false);
   assert.equal(h.$('#btn-export-data').disabled, false);
   assert.equal(h.$('#btn-import-data').disabled, false);
@@ -430,6 +488,7 @@ test('export and import announce preparation and expose a busy state', async () 
   });
   h.$('#import-file').dispatchEvent(new h.win.Event('change', { bubbles: true }));
   assert.equal(h.$('#data-status').textContent, 'Checking import...');
+  assert.equal(h.$('#data-status').dataset.state, 'progress');
   assert.equal(h.$('#data-backup').getAttribute('aria-busy'), 'true');
   assert.equal(h.$('#btn-export-data').disabled, true);
   assert.equal(h.$('#btn-import-data').disabled, true);
@@ -784,6 +843,8 @@ test('every palette and appearance is offered as a control', async () => {
 
   assert.equal(h.$$('#palette-row .swatch').length, Object.keys(h.bcp.PALETTES).length);
   assert.equal(h.$$('#appearance-row .swatch').length, Object.keys(h.bcp.APPEARANCES).length);
+  assert.ok(h.$('#colours').contains(h.$('#palette-row')));
+  assert.ok(h.$('#appearance').contains(h.$('#appearance-row')));
 
   h.close();
 });
@@ -1201,7 +1262,7 @@ test('mode and board actions are placed on the main screen in task order', async
   assert.equal(h.$('.mode-panel').contains(h.$('.seg-mode')), true, 'mode is on the main screen');
   assert.equal(h.$('#settings').contains(h.$('.seg-mode')), false, 'settings no longer owns mode');
   assert.deepEqual(h.$$('.seg-mode .seg-btn').map(btn => btn.dataset.mode),
-    ['daily', 'levels', 'free'], 'mode tabs should follow the chosen Daily, Levels, Free play order');
+    ['free', 'levels', 'daily'], 'mode tabs should follow the chosen Free play, Levels, Daily order');
   assert.equal(h.$('#btn-more'), null, 'the board menu trigger is removed');
   assert.equal(h.$('#more'), null, 'the board menu itself is removed');
 
@@ -1542,7 +1603,7 @@ test('malformed or incompatible imports are rejected without changing saved data
   assert.equal(JSON.stringify(h.storage()), before, 'a rejected import cannot partially write');
   assert.equal(h.$('#confirm-import').hidden, true, 'invalid data never reaches confirmation');
   assert.match(h.$('#data-status').textContent, /version is not supported/i);
-  assert.equal(h.$('#data-status').classList.contains('is-error'), true);
+  assert.equal(h.$('#data-status').dataset.state, 'error');
   assert.equal(h.$('#data-backup').hidden, false, 'errors stay with the transfer controls');
   assert.equal(h.$('#settings').hidden, true);
 

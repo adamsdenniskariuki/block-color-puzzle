@@ -355,10 +355,16 @@ consecutive frames match before recording. That is safe because a real bleed is 
   compact entry row. A valid import hides that modal for confirmation; cancel, validation
   failure and completion return to it, while only Back/Escape/backdrop return to Settings.
   Keep focus moving with the same ownership or keyboard users land behind the open dialog.
+- **Colours, Appearance and Options follow the same ownership rule.** Settings contains only
+  their two-line entry rows; their existing controls live in dedicated dialogs. Back, Escape
+  and backdrop return to Settings and restore focus to the row that opened the dialog.
 - **Transfer progress must paint before the browser takes over.** Export yields a rendered
   status frame before clicking its download link. Import keeps the file-picker click in the
   original user gesture, then announces and exposes `aria-busy` while reading the selected
   file. Disable both transfer buttons during either operation so their busy states cannot race.
+- **Transfer status is a panel, not muted helper copy.** Progress, success and errors use the
+  same bordered `#data-status` surface beneath the buttons, with `role="status"` and live text.
+  Keep its text on `--text`; semantic colour may reinforce the border but must not carry meaning.
 
 ## Feedback traps
 
@@ -550,6 +556,86 @@ vacuous ones have been found here already.
 | `index.html` | The DOM contract the tests depend on. Changing IDs breaks tests. |
 | `sw.js` | Bump `CACHE` on every change to a file in its `ASSETS` list. |
 | `tests/layout.test.mjs` | Read `measure()` first — it defines everything the assertions can see. |
+
+## Windows Store bundle
+
+Use PWABuilder's modern Edge **Hosted App Model**. It produces one architecture-neutral
+`.msixbundle` for Windows 10/11 Desktop; the installed Edge runtime supplies x64 or arm64
+support. Do not build separate native packages just to cover those architectures.
+
+The Partner Center identity is fixed:
+
+| Field | Value |
+| --- | --- |
+| Store ID | `9N0LK87KQ0G4` |
+| Identity name | `Favor.Sortile-ColourBlockPuzzle` |
+| Publisher | `CN=57DB65E9-045A-4FDC-A2CF-67FFF362102F` |
+| Publisher display name | `Favor` |
+| PFN | `Favor.Sortile-ColourBlockPuzzle_3zs66k1vmpvq6` |
+| Application ID | `App` |
+
+Generate through PWABuilder's production endpoint:
+`POST https://pwabuilder-windows-docker.azurewebsites.net/msix/generatezip`. Send the
+manifest JSON from the exact commit being packaged in the request's `manifest` field;
+do not rely on manifest discovery when the live Pages site may still be on an older
+commit. The important request values are:
+
+```json
+{
+  "name": "Sortile — Colour Block Puzzle",
+  "packageId": "Favor.Sortile-ColourBlockPuzzle",
+  "url": "https://adamsdenniskariuki.github.io/block-color-puzzle/",
+  "version": "1.0.1",
+  "allowSigning": true,
+  "publisher": {
+    "displayName": "Favor",
+    "commonName": "CN=57DB65E9-045A-4FDC-A2CF-67FFF362102F"
+  },
+  "edgeChannel": "stable",
+  "applicationId": "App",
+  "generateModernPackage": true,
+  "classicPackage": {
+    "generate": false
+  },
+  "manifestUrl": "https://adamsdenniskariuki.github.io/block-color-puzzle/manifest.webmanifest",
+  "images": {
+    "baseImage": "https://adamsdenniskariuki.github.io/block-color-puzzle/icons/icon-512.png",
+    "backgroundColor": "transparent",
+    "padding": 0
+  },
+  "resourceLanguage": "en-us",
+  "targetDeviceFamilies": ["Desktop"],
+  "extensions": "appurihandler"
+}
+```
+
+Increment the package version for later submissions; Partner Center reserves the fourth
+component, so submit `x.y.z` and expect `x.y.z.0` in the bundle. The response is a zip
+containing both `.msixbundle` and `.sideload.msix`. **Upload only the `.msixbundle`** to
+Partner Center. The sideload package and installer script are for local installation,
+not Store submission. Do not invent or buy a signing certificate: the Store accepts
+the unsigned Store-targeted bundle and signs it during ingestion.
+
+Validate before upload:
+
+1. Run `makeappx.exe unbundle`, then `makeappx.exe unpack` on the inner `.appx`.
+2. Inspect both manifests for the exact identity, publisher, `1.0.1.0`-style version,
+   neutral architecture, `Windows.Desktop` with `MinVersion="10.0.19041.0"`, stable Edge
+   `HostRuntimeDependency`, `uap10:HostId="PWA"`, and every referenced image.
+3. Run the Windows App Certification Kit:
+   `appcert.exe test -appxpackagepath <bundle> -reportoutputpath <report.xml>`.
+   `appcert.exe` returns before its worker finishes, so wait for its process to exit and
+   require `OVERALL_RESULT="PASS"` with `PARTIAL_RUN="FALSE"` in the report.
+4. Confirm the PFN reported by WACK is the Partner Center PFN above, record a SHA-256
+   hash for the upload bundle, and run `npm run test:all`.
+
+The hosted bundle contains Windows registration and generated icon resources, **not**
+the site's HTML, CSS, or JavaScript. The service worker supplies offline behavior after
+the first successful network load. A newly packaged feature is not available in the
+Store app until that exact web commit is deployed. Bundling the runtime locally would
+mean building and maintaining a separate native WebView2 shell, so do not do that
+without an explicit architecture decision. Packaging-only work does not require a
+service-worker cache bump.
 
 ## Status
 

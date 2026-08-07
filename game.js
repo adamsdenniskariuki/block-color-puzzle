@@ -90,7 +90,7 @@
 
   const COLS = 5;                   // one column per colour
   const APP_VERSION = '1.0.0';
-  const BUILD_ID = 'bcp-v33';       // must match CACHE in sw.js
+  const BUILD_ID = 'bcp-v34';       // must match CACHE in sw.js
   const FEEDBACK_EMAIL = 'sortilefeedback@gmail.com';
   const STORAGE_KEY = 'bcp.v1';
   const EXPORT_FORMAT = 'sortile-settings-and-stats';
@@ -139,6 +139,12 @@
     levelsSummary: document.getElementById('levels-summary'),
     help:     document.getElementById('help'),
     settings: document.getElementById('settings'),
+    colours: document.getElementById('colours'),
+    coloursTitle: document.getElementById('colours-title'),
+    appearanceDialog: document.getElementById('appearance'),
+    appearanceTitle: document.getElementById('appearance-title'),
+    options: document.getElementById('options'),
+    optionsTitle: document.getElementById('options-title'),
     dataBackup: document.getElementById('data-backup'),
     dataBackupTitle: document.getElementById('data-backup-title'),
     feedback: document.getElementById('feedback'),
@@ -604,9 +610,10 @@
     return next;
   }
 
-  function showDataStatus(message, error = false) {
+  function showDataStatus(message, state = 'idle') {
     el.dataStatus.textContent = message;
-    el.dataStatus.classList.toggle('is-error', error);
+    el.dataStatus.dataset.state = state;
+    el.dataStatus.hidden = !message;
   }
 
   function setDataBusy(busy) {
@@ -622,7 +629,7 @@
 
   async function exportDataFile() {
     setDataBusy(true);
-    showDataStatus('Preparing export...');
+    showDataStatus('Preparing export...', 'progress');
     try {
       await afterDataStatusPaint();
       const data = buildExportData();
@@ -635,9 +642,9 @@
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 0);
-      showDataStatus('Export ready.');
+      showDataStatus('Export ready.', 'success');
     } catch (error) {
-      showDataStatus(error.message || 'Sortile could not create the export file.', true);
+      showDataStatus(error.message || 'Sortile could not create the export file.', 'error');
     } finally {
       setDataBusy(false);
     }
@@ -659,7 +666,7 @@
       pendingImport = null;
       el.settings.hidden = true;
       el.dataBackup.hidden = false;
-      showDataStatus(error.message, true);
+      showDataStatus(error.message, 'error');
       return false;
     }
   }
@@ -682,6 +689,7 @@
     applyTheme();
     applyFxPrefs();
     syncThemeUi();
+    syncOptionsSummary();
     repaintColours();
     state.tiles.forEach(tile => {
       if (tile) tile.textContent = el.symbols.checked ? SYMBOLS[Number(tile.dataset.colour)] : '';
@@ -697,7 +705,7 @@
       el.confirmImport.hidden = true;
       el.settings.hidden = true;
       el.dataBackup.hidden = false;
-      showDataStatus(error.message, true);
+      showDataStatus(error.message, 'error');
       document.getElementById('btn-import-data').focus();
       return false;
     }
@@ -708,7 +716,7 @@
     el.dataBackup.hidden = false;
     applyImportedPreferences(data);
     syncModeUi();
-    showDataStatus('Imported. Difficulty applies to your next Free play board.');
+    showDataStatus('Imported. Difficulty applies to your next Free play board.', 'success');
     document.getElementById('btn-import-data').focus();
     return true;
   }
@@ -1972,6 +1980,8 @@
       btn.classList.toggle('is-active', on);
       btn.setAttribute('aria-pressed', String(on));
     }
+    document.getElementById('colours-summary').textContent = PALETTES[state.palette].name + ' selected';
+    document.getElementById('appearance-summary').textContent = APPEARANCES[state.appearance] + ' selected';
   }
 
   /* ---------------- input wiring ---------------- */
@@ -2109,16 +2119,29 @@
     });
   });
 
-  el.hints.addEventListener('change', () => { savePrefs(); refreshTileState(); });
+  function syncOptionsSummary() {
+    const enabled = [
+      el.hints.checked && 'Fade unsorted',
+      el.symbols.checked && 'Symbols',
+      el.sound.checked && 'Sound',
+      !el.hapticsWrap.hidden && el.haptics.checked && 'Vibrate'
+    ].filter(Boolean);
+    document.getElementById('options-summary').textContent =
+      enabled.length ? enabled.join(', ') : 'All options off';
+  }
+
+  el.hints.addEventListener('change', () => { savePrefs(); refreshTileState(); syncOptionsSummary(); });
   el.sound.addEventListener('change', () => {
     savePrefs();
     applyFxPrefs();
     if (el.sound.checked) FX.sound.click();
+    syncOptionsSummary();
   });
   el.haptics.addEventListener('change', () => {
     savePrefs();
     applyFxPrefs();
     if (el.haptics.checked) FX.haptics.slide(2);
+    syncOptionsSummary();
   });
   el.symbols.addEventListener('change', () => {
     savePrefs();
@@ -2126,6 +2149,7 @@
     state.tiles.forEach(tile => {
       if (tile) tile.textContent = el.symbols.checked ? SYMBOLS[Number(tile.dataset.colour)] : '';
     });
+    syncOptionsSummary();
   });
 
   document.getElementById('btn-help').addEventListener('click', () => {
@@ -2159,22 +2183,38 @@
   });
   el.feedback.addEventListener('click', e => { if (e.target === el.feedback) closeFeedback(); });
 
-  function openDataBackup() {
-    showDataStatus('');
+  const settingsDialogs = [
+    { modal: el.colours, title: el.coloursTitle, trigger: 'btn-colours', back: 'btn-colours-back' },
+    { modal: el.appearanceDialog, title: el.appearanceTitle, trigger: 'btn-appearance', back: 'btn-appearance-back' },
+    { modal: el.options, title: el.optionsTitle, trigger: 'btn-options', back: 'btn-options-back' },
+    { modal: el.dataBackup, title: el.dataBackupTitle, trigger: 'btn-data-backup', back: 'btn-data-backup-back' },
+    { modal: el.feedback, title: el.feedbackTitle, trigger: 'btn-feedback', back: 'btn-feedback-back' }
+  ];
+
+  function openSettingsDialog(config) {
+    if (config.modal === el.dataBackup) showDataStatus('');
+    if (config.modal === el.feedback) {
+      openFeedback();
+      return;
+    }
     el.settings.hidden = true;
-    el.dataBackup.hidden = false;
-    el.dataBackupTitle.focus();
+    config.modal.hidden = false;
+    config.title.focus();
   }
 
-  function closeDataBackup() {
-    el.dataBackup.hidden = true;
+  function closeSettingsDialog(config) {
+    config.modal.hidden = true;
     el.settings.hidden = false;
-    document.getElementById('btn-data-backup').focus();
+    document.getElementById(config.trigger).focus();
   }
 
-  document.getElementById('btn-data-backup').addEventListener('click', openDataBackup);
-  document.getElementById('btn-data-backup-back').addEventListener('click', closeDataBackup);
-  el.dataBackup.addEventListener('click', e => { if (e.target === el.dataBackup) closeDataBackup(); });
+  for (const config of settingsDialogs.filter(item => item.modal !== el.feedback)) {
+    document.getElementById(config.trigger).addEventListener('click', () => openSettingsDialog(config));
+    document.getElementById(config.back).addEventListener('click', () => closeSettingsDialog(config));
+    config.modal.addEventListener('click', e => {
+      if (e.target === config.modal) closeSettingsDialog(config);
+    });
+  }
   el.exportData.addEventListener('click', exportDataFile);
   el.importData.addEventListener('click', () => {
     showDataStatus('Choose a Sortile export file.');
@@ -2185,15 +2225,15 @@
     el.importFile.value = '';
     if (!file) return;
     if (file.size > MAX_IMPORT_BYTES) {
-      showDataStatus('The import file is too large.', true);
+      showDataStatus('The import file is too large.', 'error');
       return;
     }
     setDataBusy(true);
-    showDataStatus('Checking import...');
+    showDataStatus('Checking import...', 'progress');
     try {
       stageImportText(await file.text());
     } catch {
-      showDataStatus('Sortile could not read the selected file.', true);
+      showDataStatus('Sortile could not read the selected file.', 'error');
     } finally {
       setDataBusy(false);
     }
@@ -2214,6 +2254,9 @@
     const openModal = !el.feedback.hidden ? el.feedback
       : !el.confirmImport.hidden ? el.confirmImport
       : !el.dataBackup.hidden ? el.dataBackup
+      : !el.options.hidden ? el.options
+      : !el.appearanceDialog.hidden ? el.appearanceDialog
+      : !el.colours.hidden ? el.colours
       : !el.confirmNew.hidden ? el.confirmNew
       : !el.levels.hidden ? el.levels
       : !el.stats.hidden ? el.stats
@@ -2224,11 +2267,14 @@
       if (e.key === 'Escape') {
         if (openModal === el.feedback) closeFeedback();
         else if (openModal === el.confirmImport) cancelImport();
-        else if (openModal === el.dataBackup) closeDataBackup();
-        else openModal.hidden = true;
+        else {
+          const settingsDialog = settingsDialogs.find(item => item.modal === openModal);
+          if (settingsDialog) closeSettingsDialog(settingsDialog);
+          else openModal.hidden = true;
+        }
         e.preventDefault();
-      } else if ((openModal === el.feedback || openModal === el.dataBackup ||
-                  openModal === el.confirmImport) && e.key === 'Tab') {
+      } else if ((openModal === el.confirmImport ||
+                  settingsDialogs.some(item => item.modal === openModal)) && e.key === 'Tab') {
         trapModalTab(openModal, e);
       }
       return;
@@ -2360,8 +2406,10 @@
   if (FX.haptics.supported) el.hapticsWrap.hidden = false;
 
   loadPrefs();
+  syncOptionsSummary();
   buildPalettePicker();
   buildAppearancePicker();
+  syncThemeUi();
   // Put a half-finished board back before the mode UI syncs, since restoring
   // sets the mode the UI has to reflect.
   const resumed = restoreInplay();

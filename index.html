@@ -61,9 +61,9 @@
   <section class="mode-panel" aria-label="Puzzle mode">
     <div class="mode-row">
       <div class="seg seg-mode" role="group" aria-label="Game mode">
-        <button class="seg-btn" type="button" data-mode="daily">Daily</button>
-        <button class="seg-btn" type="button" data-mode="levels">Levels</button>
         <button class="seg-btn is-active" type="button" data-mode="free">Free play</button>
+        <button class="seg-btn" type="button" data-mode="levels">Levels</button>
+        <button class="seg-btn" type="button" data-mode="daily">Daily</button>
       </div>
       <button id="btn-new" class="btn" type="button" aria-label="New board">
         <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-new"/></svg>
@@ -168,37 +168,31 @@
     </div>
     <p id="diff-note" class="field-note" hidden>The daily and levels have a fixed board size.</p>
 
-    <p class="field-label" id="lbl-palette">Colours</p>
-    <div id="palette-row" class="swatch-row" role="group" aria-labelledby="lbl-palette"></div>
-
-    <p class="field-label" id="lbl-appearance">Appearance</p>
-    <div id="appearance-row" class="swatch-row" role="group" aria-labelledby="lbl-appearance"></div>
-
-    <p class="field-label">Options</p>
-    <div class="toggles">
-      <label class="toggle">
-        <input type="checkbox" id="opt-hints">
-        <span class="switch"></span>
-        <span class="toggle-text">Fade unsorted</span>
-      </label>
-      <label class="toggle">
-        <input type="checkbox" id="opt-symbols">
-        <span class="switch"></span>
-        <span class="toggle-text">Symbols</span>
-      </label>
-      <label class="toggle">
-        <input type="checkbox" id="opt-sound">
-        <span class="switch"></span>
-        <span class="toggle-text">Sound</span>
-      </label>
-      <label class="toggle" id="opt-haptics-wrap" hidden>
-        <input type="checkbox" id="opt-haptics">
-        <span class="switch"></span>
-        <span class="toggle-text">Vibrate</span>
-      </label>
-    </div>
-
     <div class="settings-utilities">
+    <button id="btn-colours" class="settings-entry" type="button" aria-haspopup="dialog">
+      <span class="settings-entry-copy">
+        <span class="settings-entry-title">Colours</span>
+        <span id="colours-summary" class="settings-entry-note">Classic selected</span>
+      </span>
+      <span class="settings-entry-arrow" aria-hidden="true"></span>
+    </button>
+
+    <button id="btn-appearance" class="settings-entry" type="button" aria-haspopup="dialog">
+      <span class="settings-entry-copy">
+        <span class="settings-entry-title">Appearance</span>
+        <span id="appearance-summary" class="settings-entry-note">Dark selected</span>
+      </span>
+      <span class="settings-entry-arrow" aria-hidden="true"></span>
+    </button>
+
+    <button id="btn-options" class="settings-entry" type="button" aria-haspopup="dialog">
+      <span class="settings-entry-copy">
+        <span class="settings-entry-title">Options</span>
+        <span id="options-summary" class="settings-entry-note">Gameplay and accessibility aids</span>
+      </span>
+      <span class="settings-entry-arrow" aria-hidden="true"></span>
+    </button>
+
     <button id="btn-data-backup" class="settings-entry" type="button" aria-haspopup="dialog">
       <span class="settings-entry-copy">
         <span class="settings-entry-title">Data &amp; backup</span>
@@ -222,6 +216,57 @@
   </div>
 </div>
 
+<div id="colours" class="modal settings-subdialog" role="dialog" aria-modal="true"
+     aria-labelledby="colours-title" hidden>
+  <div class="modal-card settings-subdialog-card">
+    <h2 id="colours-title" tabindex="-1">Colours</h2>
+    <p class="settings-subdialog-intro">Choose the block palette. Your current board updates immediately.</p>
+    <div id="palette-row" class="swatch-row" role="group" aria-labelledby="colours-title"></div>
+    <button id="btn-colours-back" class="btn btn-quiet" type="button">Back to Settings</button>
+  </div>
+</div>
+
+<div id="appearance" class="modal settings-subdialog" role="dialog" aria-modal="true"
+     aria-labelledby="appearance-title" hidden>
+  <div class="modal-card settings-subdialog-card">
+    <h2 id="appearance-title" tabindex="-1">Appearance</h2>
+    <p class="settings-subdialog-intro">Choose how the surfaces around the board look.</p>
+    <div id="appearance-row" class="swatch-row" role="group" aria-labelledby="appearance-title"></div>
+    <button id="btn-appearance-back" class="btn btn-quiet" type="button">Back to Settings</button>
+  </div>
+</div>
+
+<div id="options" class="modal settings-subdialog" role="dialog" aria-modal="true"
+     aria-labelledby="options-title" hidden>
+  <div class="modal-card settings-subdialog-card">
+    <h2 id="options-title" tabindex="-1">Options</h2>
+    <p class="settings-subdialog-intro">Adjust gameplay and accessibility aids. Changes apply immediately.</p>
+    <div class="toggles">
+      <label class="toggle">
+        <input type="checkbox" id="opt-hints">
+        <span class="switch"></span>
+        <span class="toggle-text">Fade unsorted</span>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" id="opt-symbols">
+        <span class="switch"></span>
+        <span class="toggle-text">Symbols</span>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" id="opt-sound">
+        <span class="switch"></span>
+        <span class="toggle-text">Sound</span>
+      </label>
+      <label class="toggle" id="opt-haptics-wrap" hidden>
+        <input type="checkbox" id="opt-haptics">
+        <span class="switch"></span>
+        <span class="toggle-text">Vibrate</span>
+      </label>
+    </div>
+    <button id="btn-options-back" class="btn btn-quiet" type="button">Back to Settings</button>
+  </div>
+</div>
+
 <div id="data-backup" class="modal" role="dialog" aria-modal="true"
      aria-labelledby="data-backup-title" hidden>
   <div class="modal-card data-backup-card">
@@ -233,7 +278,8 @@
       <button id="btn-import-data" class="btn" type="button">Import</button>
       <input id="import-file" type="file" accept="application/json,.json" hidden>
     </div>
-    <p id="data-status" class="field-note data-status" role="status" aria-live="polite"></p>
+    <div id="data-status" class="data-status" role="status" aria-live="polite"
+         data-state="idle" hidden></div>
     <button id="btn-data-backup-back" class="btn btn-quiet" type="button">Back to Settings</button>
   </div>
 </div>

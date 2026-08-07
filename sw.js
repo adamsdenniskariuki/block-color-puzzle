@@ -1,4 +1,4 @@
-const CACHE = 'bcp-v33';
+const CACHE = 'bcp-v34';
 
 const ASSETS = [
   './',

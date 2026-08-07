@@ -963,13 +963,13 @@ test('a theme previewed inside another theme still looks like itself', async (t)
   await context.close();
 });
 
-// The settings swatches put a fixed-width preview and a label on one line, so
+// The picker swatches put a fixed-width preview and a label on one line, so
 // the label is what runs out of room. It is a single unbreakable word, so it
 // does not wrap - it spills straight out of the rounded card, which looks far
 // worse than the stacked layout it replaced. Narrow phones fall back to
 // stacking for exactly this reason, and this is the test that decides whether
 // that threshold sits in the right place.
-test('settings swatch labels stay inside their cards', async (t) => {
+test('picker swatch labels stay inside their cards', async (t) => {
   const context = await browser.newContext();
   context.setDefaultTimeout(15000);
   const page = await context.newPage();
@@ -980,12 +980,12 @@ test('settings swatch labels stay inside their cards', async (t) => {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await page.goto(`${server.url}/index.html`);
       await page.waitForFunction(() => Boolean(window.__bcp));
-      await page.evaluate(() => { document.getElementById('settings').hidden = false; });
-      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-
-      const labels = await page.evaluate(() => {
+      await page.click('#btn-settings');
+      await page.click('#btn-colours');
+      await settle(page);
+      const paletteLabels = await page.evaluate(() => {
         const out = [];
-        for (const sw of document.querySelectorAll('#palette-row .swatch, #appearance-row .swatch')) {
+        for (const sw of document.querySelectorAll('#palette-row .swatch')) {
           const name = sw.querySelector('.swatch-name');
           const card = sw.getBoundingClientRect();
           const label = name.getBoundingClientRect();
@@ -1000,12 +1000,80 @@ test('settings swatch labels stay inside their cards', async (t) => {
         }
         return out;
       });
+      await page.click('#btn-colours-back');
+      await page.click('#btn-appearance');
+      await settle(page);
+      const appearanceLabels = await page.evaluate(() => {
+        const out = [];
+        for (const sw of document.querySelectorAll('#appearance-row .swatch')) {
+          const name = sw.querySelector('.swatch-name');
+          const card = sw.getBoundingClientRect();
+          const label = name.getBoundingClientRect();
+          const pad = parseFloat(getComputedStyle(sw).paddingRight);
+          out.push({
+            text: name.textContent,
+            spill: Math.round(label.right - (card.right - pad)),
+            clipped: name.scrollWidth > name.clientWidth + 1
+          });
+        }
+        return out;
+      });
+      const labels = [...paletteLabels, ...appearanceLabels];
 
       assert.ok(labels.length > 0, 'found no swatches - the picker did not render');
 
       for (const o of labels) {
         assert.ok(o.spill <= 1, `"${o.text}" overflows its card by ${o.spill}px`);
         assert.ok(!o.clipped, `"${o.text}" is truncated rather than shown in full`);
+      }
+    });
+  }
+
+  await context.close();
+});
+
+test('Settings subdialogs stay contained across supported viewport classes', async (t) => {
+  const context = await browser.newContext();
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  const viewports = [
+    { name: 'small phone', width: 320, height: 568 },
+    { name: 'phone', width: 390, height: 844 },
+    { name: 'landscape phone', width: 740, height: 360 },
+    { name: 'tablet', width: 768, height: 1024 },
+    { name: 'desktop', width: 1280, height: 800 }
+  ];
+
+  for (const vp of viewports) {
+    await t.test(vp.name, async () => {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.goto(`${server.url}/index.html`);
+      await page.waitForFunction(() => Boolean(window.__bcp));
+      await page.click('#btn-settings');
+
+      for (const id of ['colours', 'appearance', 'options']) {
+        await page.click(`#btn-${id}`);
+        await settle(page);
+        const result = await page.evaluate((modalId) => {
+          const modal = document.getElementById(modalId);
+          const card = modal.querySelector('.modal-card');
+          const r = card.getBoundingClientRect();
+          const controls = [...card.querySelectorAll('button, input')]
+            .filter(node => !node.closest('[hidden]'))
+            .map(node => node.getBoundingClientRect());
+          return {
+            contained: r.left >= -1 && r.top >= -1 &&
+              r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1,
+            controlsContained: controls.every(c => c.left >= r.left - 1 && c.top >= r.top - 1 &&
+              c.right <= r.right + 1 && c.bottom <= r.bottom + 1),
+            pageScroll: document.documentElement.scrollWidth - innerWidth
+          };
+        }, id);
+        assert.equal(result.contained, true, `${id} card escaped ${vp.name}`);
+        assert.equal(result.controlsContained, true, `${id} controls escaped their card on ${vp.name}`);
+        assert.ok(result.pageScroll <= SLACK, `${id} caused horizontal page scroll on ${vp.name}`);
+        await page.click(`#btn-${id}-back`);
       }
     });
   }
@@ -1090,6 +1158,43 @@ test('Data & backup modal keeps transfer actions contained at 390x844', async ()
   assert.ok(m.overflow <= SLACK, `Data & backup should fit without scrolling, overflowed by ${m.overflow}px`);
   assert.equal(m.cardContained, true);
   assert.equal(m.actionsContained, true);
+
+  await context.close();
+});
+
+test('Data & backup status panel keeps readable text in every theme', async (t) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+  await page.goto(`${server.url}/index.html`);
+  await page.waitForFunction(() => Boolean(window.__bcp));
+  await page.click('#btn-settings');
+  await page.click('#btn-data-backup');
+
+  for (const [id, name] of Object.entries(await page.evaluate(() => window.__bcp.APPEARANCES))) {
+    await t.test(name, async () => {
+      const probe = await page.evaluate((theme) => {
+        window.__bcp.setAppearance(theme);
+        window.__bcp.stageImportText('{');
+        const panel = document.getElementById('data-status');
+        const cs = getComputedStyle(panel);
+        const rect = panel.getBoundingClientRect();
+        return {
+          hidden: panel.hidden,
+          state: panel.dataset.state,
+          text: cs.color,
+          background: cs.backgroundColor,
+          height: rect.height
+        };
+      }, id);
+      const ratio = contrast(parseRgb(probe.text), parseRgb(probe.background));
+      assert.equal(probe.hidden, false, 'an error should expose the status panel');
+      assert.equal(probe.state, 'error', 'an invalid import should use error state');
+      assert.ok(probe.height >= 44, `status panel is only ${probe.height}px tall`);
+      assert.ok(ratio >= 4.5, `status text is ${ratio.toFixed(2)}:1 in ${name}, needs 4.5:1`);
+    });
+  }
 
   await context.close();
 });

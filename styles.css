@@ -807,8 +807,6 @@ h2 + .field-label { margin-top: 0; }
   color: var(--text-dim);
 }
 
-#settings .toggles { margin-bottom: 0; }
-
 .settings-utilities {
   display: grid;
   gap: 8px;
@@ -826,11 +824,42 @@ h2 + .field-label { margin-top: 0; }
 .data-backup-note { margin-bottom: 16px; }
 
 .data-status {
-  min-height: 18px;
-  margin-bottom: 12px;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  margin: 12px 0;
+  padding: 11px 13px;
+  border: 2px solid var(--line-bright);
+  border-radius: 10px;
+  background: var(--surface-hi);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
 }
 
-.data-status.is-error { color: var(--danger); }
+.data-status[data-state="progress"] { border-color: var(--accent); }
+.data-status[data-state="success"] { border-color: var(--accent); }
+.data-status[data-state="error"] { border-color: var(--danger); }
+
+.settings-subdialog-card {
+  max-width: 400px;
+}
+
+.settings-subdialog-intro {
+  margin: 0 0 16px;
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.settings-subdialog-card .toggles {
+  margin-bottom: 16px;
+}
+
+.settings-subdialog-card .swatch-row {
+  margin-bottom: 16px;
+}
 
 .settings-entry {
   width: 100%;
