@@ -1,8 +1,9 @@
-const CACHE = 'bcp-v34';
+const CACHE = 'bcp-v35';
 
 const ASSETS = [
   './',
   './index.html',
+  './privacy.html',
   './styles.css',
   './game.js',
   './fx.js',

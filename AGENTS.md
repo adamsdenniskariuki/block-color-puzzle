@@ -383,6 +383,19 @@ consecutive frames match before recording. That is safe because a real bleed is 
   than the viewport; `.modal-scroll` owns scrolling while the sibling `.modal-foot` keeps
   Done reachable. Do not compress the existing controls to make new rows fit.
 
+## Privacy policy traps
+
+- **Privacy claims must follow the implementation, not marketing shorthand.** `privacy.html`
+  mirrors the local `bcp.v1` store, the export/import boundary and the feedback diagnostic
+  allowlist above. Update the policy before releasing any feature that changes collection,
+  storage, sharing, hosting or deletion behavior.
+- **The policy is a shipped offline asset.** Keep `privacy.html` in `sw.js` `ASSETS`, bump
+  `CACHE`/`BUILD_ID` with policy or link changes, and keep the direct production URL stable
+  for Store listings: `/block-color-puzzle/privacy.html`.
+- **Platform request data is not app analytics.** The policy distinguishes Sortile's lack of
+  trackers from standard technical data GitHub Pages, Edge, the Microsoft Store, the OS or
+  network providers may process under their own policies.
+
 ## Resume traps
 
 - **`saveInplay()` hangs off `updateHud()`.** That looks like a layering mistake and is not:

@@ -1232,3 +1232,59 @@ test('feedback preflight keeps its actions usable at 390x844', async () => {
 
   await context.close();
 });
+
+test('privacy policy stays readable and contained in light and dark themes at 390x844', async (t) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  context.setDefaultTimeout(10000);
+  const page = await context.newPage();
+  await page.route('**/sw.js', (route) => route.abort());
+
+  for (const theme of ['light', 'dark']) {
+    await t.test(theme, async () => {
+      await page.goto(`${server.url}/privacy.html?scoutTheme=${theme}`);
+      await settle(page);
+
+      const probe = await page.evaluate(() => {
+        const card = document.querySelector('.privacy-card');
+        const heading = document.querySelector('h1');
+        const paragraph = document.querySelector('.privacy-card section p');
+        const back = document.querySelector('.privacy-back');
+        const cardStyle = getComputedStyle(card);
+        return {
+          theme: document.documentElement.dataset.theme,
+          title: heading.textContent,
+          sectionCount: document.querySelectorAll('.privacy-card section').length,
+          cardLeft: card.getBoundingClientRect().left,
+          cardRight: card.getBoundingClientRect().right,
+          scrollWidth: document.documentElement.scrollWidth,
+          innerWidth,
+          headingText: getComputedStyle(heading).color,
+          bodyText: getComputedStyle(paragraph).color,
+          cardBackground: cardStyle.backgroundColor,
+          backText: getComputedStyle(back).color,
+          pageBackground: getComputedStyle(document.body).backgroundColor,
+          date: document.querySelector('time')?.dateTime,
+          backTarget: back.getAttribute('href')
+        };
+      });
+
+      assert.equal(probe.theme, theme);
+      assert.equal(probe.title, 'Privacy policy');
+      assert.ok(probe.sectionCount >= 9, 'all policy topics should remain present');
+      assert.equal(probe.date, '2026-08-07');
+      assert.equal(probe.backTarget, 'index.html');
+      assert.ok(probe.cardLeft >= -SLACK && probe.cardRight <= probe.innerWidth + SLACK,
+        `${theme} policy card escaped the viewport`);
+      assert.ok(probe.scrollWidth <= probe.innerWidth + SLACK,
+        `${theme} policy page scrolls horizontally`);
+      assert.ok(contrast(parseRgb(probe.headingText), parseRgb(probe.cardBackground)) >= 4.5,
+        `${theme} policy heading lacks 4.5:1 contrast`);
+      assert.ok(contrast(parseRgb(probe.bodyText), parseRgb(probe.cardBackground)) >= 4.5,
+        `${theme} policy body lacks 4.5:1 contrast`);
+      assert.ok(contrast(parseRgb(probe.backText), parseRgb(probe.pageBackground)) >= 4.5,
+        `${theme} back link lacks 4.5:1 contrast`);
+    });
+  }
+
+  await context.close();
+});

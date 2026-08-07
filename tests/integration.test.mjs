@@ -553,6 +553,28 @@ test('feedback build metadata matches the package and service-worker cache', asy
   h.close();
 });
 
+test('privacy policy is discoverable, accurate and available offline', async () => {
+  const h = await fresh();
+  const privacy = fs.readFileSync(new URL('../privacy.html', import.meta.url), 'utf8');
+  const sw = fs.readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+  const resourceUrls = [...privacy.matchAll(/<(?:script|link|img)\b[^>]+(?:src|href)="([^"]+)"/gi)]
+    .map(match => match[1]);
+
+  assert.equal(h.$('.feedback-privacy a').getAttribute('href'), 'privacy.html');
+  assert.match(sw, /['"]\.\/privacy\.html['"]/);
+  assert.match(privacy, /<time datetime="2026-08-07">7 August 2026<\/time>/);
+  assert.match(privacy, /sortilefeedback@gmail\.com/);
+  assert.match(privacy, /does not ask you to create an account/i);
+  assert.match(privacy, /does not upload it/i);
+  assert.match(privacy, /does not add third-party analytics or advertising trackers/i);
+  assert.match(privacy, /does not sell personal data/i);
+  assert.match(privacy, /Clear storage for this site or app/i);
+  assert.deepEqual(resourceUrls.filter(url => /^(?:https?:)?\/\//i.test(url)), [],
+    'privacy page must not load third-party resources');
+
+  h.close();
+});
+
 test('feedback diagnostics expose only the approved fields and opt-in seeded puzzle ID', async () => {
   const h = await fresh({ width: 390 });
   const { state } = h.bcp;

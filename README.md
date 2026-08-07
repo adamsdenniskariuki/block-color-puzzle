@@ -131,6 +131,15 @@ Statistics, saved data, board position, moves, timing and hints are never added.
 If an email app or clipboard is unavailable, the same text stays selectable for
 manual copying.
 
+## Privacy
+
+Sortile has no accounts, analytics, targeted ads or third-party trackers. Game
+state, settings and statistics stay in browser/app storage unless the player
+chooses to export them. Import reads a player-selected JSON file locally, and
+feedback is handed to the player's email app with only the documented diagnostic
+allowlist. The published policy is
+**[adamsdenniskariuki.github.io/block-color-puzzle/privacy.html](https://adamsdenniskariuki.github.io/block-color-puzzle/privacy.html)**.
+
 | Action | How |
 | --- | --- |
 | Slide blocks | Tap/click any block in the empty slot's row or column |

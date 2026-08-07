@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12161c">
+<meta name="description" content="Privacy policy for Sortile — Colour Block Puzzle.">
+<title>Privacy policy — Sortile</title>
+<script>
+(() => {
+  const param = new URLSearchParams(window.location.search).get("scoutTheme");
+  const theme =
+    param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  document.documentElement.setAttribute("data-theme", theme);
+})();
+</script>
+<style>
+:root {
+  color-scheme: light;
+  --cp-bg: #f7f4ef;
+  --cp-bg-elevated: #fcfbf8;
+  --cp-surface: #ffffff;
+  --cp-surface-soft: #f5f5f5;
+  --cp-border: #dedede;
+  --cp-border-strong: #919191;
+  --cp-text: #242424;
+  --cp-text-muted: #5c5c5c;
+  --cp-text-soft: #6f6f6f;
+  --cp-accent: #b11f4b;
+  --cp-accent-hover: #9a1a41;
+  --cp-accent-soft: rgba(177, 31, 75, 0.08);
+  --cp-accent-fg: #ffffff;
+  --cp-success: #16a34a;
+  --cp-danger: #dc2626;
+  --cp-warning: #f59e0b;
+  --cp-link: #0078d4;
+  --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+  --cp-overlay: rgba(255, 255, 255, 0.8);
+  --cp-panel: rgba(255, 255, 255, 0.86);
+  --cp-panel-strong: rgba(255, 255, 255, 0.96);
+  --cp-sheen: rgba(255, 255, 255, 0.55);
+  --cp-highlight: rgba(177, 31, 75, 0.12);
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --cp-bg: #3d3b3a;
+  --cp-bg-elevated: #343231;
+  --cp-surface: #292929;
+  --cp-surface-soft: #2e2e2e;
+  --cp-border: #474747;
+  --cp-border-strong: #5f5f5f;
+  --cp-text: #dedede;
+  --cp-text-muted: #919191;
+  --cp-text-soft: #b0b0b0;
+  --cp-accent: #fd8ea1;
+  --cp-accent-hover: #fb7b91;
+  --cp-accent-soft: rgba(253, 142, 161, 0.14);
+  --cp-accent-fg: #1a1a1a;
+  --cp-success: #4ade80;
+  --cp-danger: #f87171;
+  --cp-warning: #fbbf24;
+  --cp-link: #4da6ff;
+  --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  --cp-overlay: rgba(41, 41, 41, 0.88);
+  --cp-panel: rgba(41, 41, 41, 0.72);
+  --cp-panel-strong: rgba(41, 41, 41, 0.96);
+  --cp-sheen: rgba(255, 255, 255, 0.04);
+  --cp-highlight: rgba(253, 142, 161, 0.12);
+}
+</style>
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="privacy-page">
+  <main class="privacy-shell">
+    <nav class="privacy-nav" aria-label="Back to game">
+      <a href="index.html" class="privacy-back" aria-label="Back to Sortile">← Sortile</a>
+    </nav>
+
+    <article class="privacy-card">
+      <header class="privacy-header">
+        <p class="privacy-kicker">Sortile — Colour Block Puzzle</p>
+        <h1>Privacy policy</h1>
+        <p class="privacy-lead">Sortile works without an account or analytics. Most game data stays on your device.</p>
+        <p class="privacy-date">Effective and last updated <time datetime="2026-08-07">7 August 2026</time></p>
+      </header>
+
+      <section aria-labelledby="data-on-device">
+        <h2 id="data-on-device">Data on your device</h2>
+        <p>Sortile does not ask you to create an account. Your current puzzle, preferences, statistics, daily history and level progress are stored in browser or app storage on your device so the game can resume and remember your choices.</p>
+      </section>
+
+      <section aria-labelledby="data-transfer">
+        <h2 id="data-transfer">Export and import</h2>
+        <p>You can choose to export settings, statistics and progress as a JSON file, and choose a JSON file to import. Sortile reads the selected file locally and does not upload it. Your current puzzle is not included in an export. You control where exported files are saved and which file is imported.</p>
+      </section>
+
+      <section aria-labelledby="feedback-data">
+        <h2 id="feedback-data">Optional feedback</h2>
+        <p>The Feedback tool prepares a message to <a href="mailto:sortilefeedback@gmail.com">sortilefeedback@gmail.com</a> and asks your email app to open it. Sortile does not send or store the email itself.</p>
+        <p>The prepared message includes only the Sortile version and build, current mode, difficulty and row count, a coarse device category, and browser name and major version. In Daily or Levels, you can separately choose to add that puzzle's date or level number. Anything else is included only if you type it into the email.</p>
+      </section>
+
+      <section aria-labelledby="hosting-data">
+        <h2 id="hosting-data">Hosting, Windows and offline use</h2>
+        <p>The Windows Store app is an Edge Hosted App that loads the Sortile PWA from GitHub Pages. A service worker caches app files on your device for faster loading and offline play.</p>
+        <p>GitHub Pages, Microsoft Edge, the Microsoft Store, your operating system and network providers may process standard technical request data such as IP addresses, timestamps and browser information under their own privacy policies. Sortile does not add third-party analytics or advertising trackers.</p>
+      </section>
+
+      <section aria-labelledby="sharing-data">
+        <h2 id="sharing-data">Sales, ads and sharing</h2>
+        <p>Sortile does not sell personal data, show targeted advertising or use analytics. Data is shared only when you deliberately export a file, import a file, or send feedback through your email provider.</p>
+      </section>
+
+      <section aria-labelledby="delete-data">
+        <h2 id="delete-data">Delete your data</h2>
+        <p>Clear storage for this site or app in your browser or operating-system settings, or uninstall the app, to remove Sortile's local data. Exported files and sent emails are outside Sortile and must be deleted where you saved or sent them.</p>
+      </section>
+
+      <section aria-labelledby="children-data">
+        <h2 id="children-data">Children's privacy</h2>
+        <p>Sortile is a general-audience puzzle and does not knowingly collect personal information through the game. A parent or guardian should review any feedback a child chooses to write before it is sent. Contact us if you believe a child has sent personal information through feedback.</p>
+      </section>
+
+      <section aria-labelledby="policy-changes">
+        <h2 id="policy-changes">Changes to this policy</h2>
+        <p>If Sortile's data practices change, this page will be updated and the date above will change. Material changes will be reflected before the related feature is released.</p>
+      </section>
+
+      <section aria-labelledby="privacy-contact">
+        <h2 id="privacy-contact">Contact</h2>
+        <p>Questions or privacy requests: <a href="mailto:sortilefeedback@gmail.com">sortilefeedback@gmail.com</a>.</p>
+      </section>
+    </article>
+  </main>
+<script>
+  const theme = getComputedStyle(document.documentElement).getPropertyValue('--cp-bg').trim();
+  if (theme) document.querySelector('meta[name="theme-color"]').content = theme;
+</script>
+</body>
+</html>
