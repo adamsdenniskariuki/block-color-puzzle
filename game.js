@@ -90,7 +90,7 @@
 
   const COLS = 5;                   // one column per colour
   const APP_VERSION = '1.0.0';
-  const BUILD_ID = 'bcp-v35';       // must match CACHE in sw.js
+  const BUILD_ID = 'bcp-v36';       // must match CACHE in sw.js
   const FEEDBACK_EMAIL = 'sortilefeedback@gmail.com';
   const STORAGE_KEY = 'bcp.v1';
   const EXPORT_FORMAT = 'sortile-settings-and-stats';
@@ -1998,9 +1998,6 @@
 
     if (mode === 'levels') state.level = loadLevels().current;
 
-    document.querySelectorAll('.seg-mode .seg-btn').forEach(b => {
-      b.classList.toggle('is-active', b.dataset.mode === mode);
-    });
     syncModeUi();
     newGame();
   }
@@ -2012,6 +2009,10 @@
     const levels = state.mode === 'levels';
     const savedRows = loadStore().rows;
     const preferredRows = free && [4, 5, 6].includes(savedRows) ? savedRows : state.rows;
+
+    document.querySelectorAll('.seg-mode .seg-btn').forEach(b => {
+      b.classList.toggle('is-active', b.dataset.mode === state.mode);
+    });
 
     document.querySelectorAll('.seg-diff .seg-btn').forEach(b => {
       b.disabled = !free;

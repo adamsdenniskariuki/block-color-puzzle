@@ -1689,6 +1689,26 @@ test('a resumed board does not bank its moves a second time', async () => {
   again.close();
 });
 
+test('a resumed daily or level keeps its mode highlighted', async () => {
+  for (const mode of ['daily', 'levels']) {
+    const h = await fresh();
+    h.bcp.setMode(mode);
+    await h.tick(2);
+
+    const stored = await playAndLeave(h, 2);
+    h.close();
+
+    const again = await fresh({ storage: stored });
+    assert.equal(again.bcp.state.mode, mode);
+    assert.equal(again.$$('.seg-mode .is-active').length, 1,
+      'only one mode should be highlighted');
+    assert.equal(again.$('.seg-mode .is-active').dataset.mode, mode,
+      `${mode} should remain highlighted after reopening the app`);
+
+    again.close();
+  }
+});
+
 // The daily is pinned to a date. Coming back tomorrow must deal tomorrow's
 // puzzle, not resurrect an abandoned one.
 test('a daily left over from another day is dropped rather than resumed', async () => {
