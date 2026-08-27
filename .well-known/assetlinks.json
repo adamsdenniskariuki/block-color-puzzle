@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.madebyfavor.sortile",
+      "sha256_cert_fingerprints": [
+        "90:25:56:40:03:89:6C:FB:5F:A7:4B:A7:D5:A7:7E:EB:26:AF:9C:FF:6B:80:08:78:A5:EB:8E:1F:45:B9:54:42"
+      ]
+    }
+  }
+]

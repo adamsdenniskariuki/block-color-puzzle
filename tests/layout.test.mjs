@@ -333,6 +333,20 @@ test('install metadata uses the custom-domain root as the app identity', async (
   await context.close();
 });
 
+test('Digital Asset Links binds the custom domain to the signed Android app', async () => {
+  const response = await fetch(`${server.url}/.well-known/assetlinks.json`);
+  assert.equal(response.status, 200, 'Digital Asset Links should be served');
+  const links = await response.json();
+  const app = links.find((entry) =>
+    entry.relation?.includes('delegate_permission/common.handle_all_urls'));
+
+  assert.equal(app?.target?.namespace, 'android_app');
+  assert.equal(app?.target?.package_name, 'com.madebyfavor.sortile');
+  assert.deepEqual(app?.target?.sha256_cert_fingerprints, [
+    '90:25:56:40:03:89:6C:FB:5F:A7:4B:A7:D5:A7:7E:EB:26:AF:9C:FF:6B:80:08:78:A5:EB:8E:1F:45:B9:54:42'
+  ]);
+});
+
 test('portrait keeps the stacked layout', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   context.setDefaultTimeout(10000);

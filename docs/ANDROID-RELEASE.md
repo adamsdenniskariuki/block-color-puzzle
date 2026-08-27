@@ -87,6 +87,26 @@ Bubblewrap may offer to download or configure Android SDK components on first
 use. Prefer its supported versions rather than substituting newer Java or
 Gradle versions without a reason.
 
+On Windows, Bubblewrap's APK-signing command does not quote a JDK path that
+contains spaces correctly. Configure `jdkPath` in
+`%USERPROFILE%\.bubblewrap\config.json` with the JDK's 8.3 short path:
+
+```json
+{
+  "jdkPath": "C:\\PROGRA~1\\MIE74D~1\\JDK-17~1.101",
+  "androidSdkPath": "C:\\Users\\adamsdennis\\.bubblewrap\\android_sdk"
+}
+```
+
+Resolve the machine's short path rather than copying that value blindly:
+
+```powershell
+cmd /c "for %I in (""C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot"") do @echo %~sI"
+```
+
+Run `bubblewrap doctor` after editing the config. The first build also installs
+Android Build Tools and requires accepting the Android SDK licence.
+
 ## 1. Prepare the custom-domain PWA
 
 The GitHub Pages custom domain is:
@@ -170,6 +190,40 @@ host, launch URL, package ID, app name, icon URLs, and version fields.
 Do not accept a fallback WebView package. The target is a verified TWA using
 Chrome or another compatible browser.
 
+### Values used for the first Sortile wrapper
+
+The first interactive Bubblewrap run used:
+
+| Prompt | Value |
+| --- | --- |
+| Application name | `Sortile — Colour Block Puzzle` |
+| Launcher/short name | `Sortile` |
+| Application ID | `com.madebyfavor.sortile` |
+| Display mode | `standalone` |
+| Orientation | `any` |
+| Status bar colour | `#111827` |
+| Splash colour | `#111827` |
+| Icon | `https://sortile.madebyfavor.com/icons/icon-512.png` |
+| Maskable icon | `https://sortile.madebyfavor.com/icons/icon-maskable-512.png` |
+| Monochrome icon | blank; no dedicated asset exists yet |
+| Play Billing | no |
+| Geolocation | no |
+| Notifications | no |
+| Key alias | `sortile-upload` |
+| Certificate subject | `CN=Adams Dennis, OU=Apps, O=Made by Favor, C=KE` |
+
+Bubblewrap suggested `com.madebyfavor.sortile.twa`; this was deliberately
+replaced with the shorter permanent package ID above. It also initially enabled
+notifications. Set `"enableNotifications": false` in `twa-manifest.json` and
+run `bubblewrap update`; verify `POST_NOTIFICATIONS` is absent from the generated
+Android manifest before building.
+
+Run `bubblewrap init` from the intended `android/` directory. The generator
+writes directly into the current directory. If it is accidentally run at the
+root of another Git repository, use that repository's `git status` to identify
+the generated untracked `app/`, `gradle/`, Gradle wrapper, manifest, and icon
+files, then move only those paths into Sortile's `android/` directory.
+
 ## 3. Create and protect the signing key
 
 The upload key is the long-lived identity for Android releases. Losing it makes
@@ -200,6 +254,11 @@ second secure location. Never commit:
 The generated Android project may request the keystore path and alias during
 `bubblewrap build`. Use the external path above.
 
+Create `%USERPROFILE%\.sortile-signing\` before asking Bubblewrap to create the
+keystore. `keytool` does not create a missing parent directory, and Bubblewrap
+reports only that the command failed even though the visible output says it is
+generating the key.
+
 ## 4. Obtain the SHA-256 certificate fingerprint
 
 Digital Asset Links binds the web origin to the Android package and signing
@@ -212,6 +271,12 @@ keytool -list -v `
 ```
 
 Copy the `SHA256` fingerprint exactly. Do not invent or publish a placeholder.
+
+The first Sortile upload certificate fingerprint is:
+
+```text
+90:25:56:40:03:89:6C:FB:5F:A7:4B:A7:D5:A7:7E:EB:26:AF:9C:FF:6B:80:08:78:A5:EB:8E:1F:45:B9:54:42
+```
 
 If Play App Signing is enabled, Google signs production installs with an app
 signing certificate that may differ from the local upload key. After creating
@@ -296,13 +361,68 @@ rather than assuming a path.
 
 ## 7. Test the TWA
 
+### Automated package checks
+
+Before installing on a device, verify the signed APK:
+
+```powershell
+$buildTools = "$env:USERPROFILE\.bubblewrap\android_sdk\build-tools\36.1.0"
+
+& "$buildTools\apksigner.bat" verify `
+  --verbose `
+  --print-certs `
+  .\app-release-signed.apk
+
+& "$buildTools\aapt.exe" dump badging .\app-release-signed.apk |
+  Select-String "package:|application-label:|launchable-activity:|uses-permission:"
+```
+
+Confirm:
+
+- the signature verifies
+- package name is `com.madebyfavor.sortile`
+- version code is greater than every version already uploaded to Play
+- app label and launcher label are correct
+- `POST_NOTIFICATIONS`, billing, and location permissions are absent
+- the reported signer SHA-256 matches an entry in `assetlinks.json`
+
+The shared PWA suite and the Digital Asset Links regression must also pass:
+
+```powershell
+Set-Location Q:\inno\game\block-color-puzzle
+npm run test:all
+```
+
+Every new test still requires deliberate mutation verification.
+
+### Install on a physical device
+
+On the phone:
+
+1. Enable Developer options.
+2. Enable USB debugging.
+3. Connect by USB and approve the computer's debugging key.
+
+On the development computer:
+
+```powershell
+adb devices
+adb install -r .\app-release-signed.apk
+```
+
+If `adb` is not on `PATH`, use the copy under the Android SDK's
+`platform-tools` directory. The device should appear as `device`, not
+`unauthorized`.
+
 Install the release APK on a physical Android device with Chrome:
 
 ```powershell
 adb install -r .\app-release-signed.apk
 ```
 
-Confirm:
+### Device test matrix
+
+Confirm on the installed app:
 
 - Sortile opens without browser chrome.
 - The URL remains on `sortile.madebyfavor.com`.
@@ -312,6 +432,15 @@ Confirm:
 - The TWA does not show a browser toolbar. A toolbar usually means Digital
   Asset Links verification failed.
 - Closing and reopening preserves the active mode and board.
+- Portrait and landscape both remain usable at Easy, Normal, and Hard.
+- Android Back closes dialogs before leaving the app.
+- External links leave Sortile through the expected browser or target app.
+- Sound and vibration follow their settings and device capabilities.
+- Import/export and feedback handoffs use Android's file/share surfaces.
+- No notification, billing, or location permission prompt appears.
+
+For offline startup, launch once online, close the app, enable airplane mode,
+and relaunch. Test a resumed Free play board and Daily/Levels separately.
 
 Test on the Play-distributed build again after adding the Play app-signing
 fingerprint to `assetlinks.json`.
