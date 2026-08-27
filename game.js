@@ -90,7 +90,7 @@
 
   const COLS = 5;                   // one column per colour
   const APP_VERSION = '1.0.0';
-  const BUILD_ID = 'bcp-v37';       // must match CACHE in sw.js
+  const BUILD_ID = 'bcp-v38';       // must match CACHE in sw.js
   const FEEDBACK_EMAIL = 'sortilefeedback@gmail.com';
   const STORAGE_KEY = 'bcp.v1';
   const EXPORT_FORMAT = 'sortile-settings-and-stats';
@@ -1694,6 +1694,21 @@
     }
   }
 
+  let modalHistoryActive = false;
+  let closingFromHistory = false;
+
+  function markModalOpen() {
+    if (modalHistoryActive) return;
+    history.pushState({ sortileModal: true }, '');
+    modalHistoryActive = true;
+  }
+
+  function markModalClosed() {
+    if (!modalHistoryActive || closingFromHistory) return;
+    modalHistoryActive = false;
+    history.back();
+  }
+
   /* ---------------- lifecycle ---------------- */
 
   function newGame() {
@@ -2158,9 +2173,18 @@
     const scroller = el.help.querySelector('.modal-scroll');
     if (scroller) scroller.scrollTop = 0;
     el.help.hidden = false;
+    markModalOpen();
   });
-  document.getElementById('btn-help-close').addEventListener('click', () => { el.help.hidden = true; });
-  el.help.addEventListener('click', e => { if (e.target === el.help) el.help.hidden = true; });
+  document.getElementById('btn-help-close').addEventListener('click', () => {
+    el.help.hidden = true;
+    markModalClosed();
+  });
+  el.help.addEventListener('click', e => {
+    if (e.target === el.help) {
+      el.help.hidden = true;
+      markModalClosed();
+    }
+  });
 
   el.hint.addEventListener('click', showHint);
 
@@ -2169,9 +2193,18 @@
     const scroller = el.settings.querySelector('.modal-scroll');
     if (scroller) scroller.scrollTop = 0;
     el.settings.hidden = false;
+    markModalOpen();
   });
-  document.getElementById('btn-settings-close').addEventListener('click', () => { el.settings.hidden = true; });
-  el.settings.addEventListener('click', e => { if (e.target === el.settings) el.settings.hidden = true; });
+  document.getElementById('btn-settings-close').addEventListener('click', () => {
+    el.settings.hidden = true;
+    markModalClosed();
+  });
+  el.settings.addEventListener('click', e => {
+    if (e.target === el.settings) {
+      el.settings.hidden = true;
+      markModalClosed();
+    }
+  });
 
   document.getElementById('btn-feedback').addEventListener('click', openFeedback);
   document.getElementById('btn-feedback-back').addEventListener('click', closeFeedback);
@@ -2246,9 +2279,47 @@
   document.getElementById('btn-stats').addEventListener('click', () => {
     renderStats();
     el.stats.hidden = false;
+    markModalOpen();
   });
-  document.getElementById('btn-stats-close').addEventListener('click', () => { el.stats.hidden = true; });
-  el.stats.addEventListener('click', e => { if (e.target === el.stats) el.stats.hidden = true; });
+  document.getElementById('btn-stats-close').addEventListener('click', () => {
+    el.stats.hidden = true;
+    markModalClosed();
+  });
+  el.stats.addEventListener('click', e => {
+    if (e.target === el.stats) {
+      el.stats.hidden = true;
+      markModalClosed();
+    }
+  });
+
+  window.addEventListener('popstate', () => {
+    if (!modalHistoryActive) return;
+    closingFromHistory = true;
+    modalHistoryActive = false;
+    const openModal = !el.feedback.hidden ? el.feedback
+      : !el.confirmImport.hidden ? el.confirmImport
+      : !el.dataBackup.hidden ? el.dataBackup
+      : !el.options.hidden ? el.options
+      : !el.appearanceDialog.hidden ? el.appearanceDialog
+      : !el.colours.hidden ? el.colours
+      : !el.confirmNew.hidden ? el.confirmNew
+      : !el.levels.hidden ? el.levels
+      : !el.stats.hidden ? el.stats
+      : !el.settings.hidden ? el.settings
+      : !el.help.hidden ? el.help : null;
+    if (openModal === el.feedback) closeFeedback();
+    else if (openModal === el.confirmImport) cancelImport();
+    else {
+      const settingsDialog = settingsDialogs.find(item => item.modal === openModal);
+      if (settingsDialog) {
+        settingsDialog.modal.hidden = true;
+        el.settings.hidden = true;
+      } else if (openModal) {
+        openModal.hidden = true;
+      }
+    }
+    closingFromHistory = false;
+  });
 
   // Arrow keys push a block in the pressed direction, into the gap.
   document.addEventListener('keydown', e => {

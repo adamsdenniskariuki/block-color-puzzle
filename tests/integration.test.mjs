@@ -764,6 +764,26 @@ test('Escape closes an open modal', async () => {
   h.close();
 });
 
+test('browser Back closes the active modal instead of leaving the game', async () => {
+  const h = await fresh();
+
+  h.click('#btn-settings');
+  assert.equal(h.$('#settings').hidden, false);
+  h.win.history.back();
+  await h.tick(2);
+  assert.equal(h.$('#settings').hidden, true, 'Back should close Settings');
+
+  h.click('#btn-settings');
+  h.click('#btn-options');
+  assert.equal(h.$('#options').hidden, false);
+  h.win.history.back();
+  await h.tick(2);
+  assert.equal(h.$('#options').hidden, true, 'Back should close a nested Settings dialog');
+  assert.equal(h.$('#settings').hidden, true, 'Back should return to the game, not another modal');
+
+  h.close();
+});
+
 /* ---------------- themes ---------------- */
 
 test('switching palette repaints in place without reordering the board', async () => {
