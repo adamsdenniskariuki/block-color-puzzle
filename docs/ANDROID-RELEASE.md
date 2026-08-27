@@ -322,6 +322,10 @@ It must:
 - contain the exact package name
 - contain the certificate used to sign the installed app
 
+This repository includes a root `.nojekyll` file. GitHub Pages' legacy Jekyll
+build otherwise excludes dot-directories, so the committed
+`.well-known/assetlinks.json` exists in Git but returns HTTP 404 in production.
+
 Verify after deployment:
 
 ```powershell
