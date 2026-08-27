@@ -18,7 +18,7 @@ Use the existing Partner Center product. Do not create a second app identity.
 | Publisher | `CN=57DB65E9-045A-4FDC-A2CF-67FFF362102F` |
 | Publisher display name | `Favor` |
 | Display name | `Sortile - Colour Block Puzzle` |
-| Start URL | `https://adamsdenniskariuki.github.io/block-color-puzzle/` |
+| Start URL | `https://sortile.madebyfavor.com/` |
 
 The display name must use the ASCII hyphen shown above. Partner Center rejected
 the earlier package whose display name contained an em dash.
@@ -81,7 +81,7 @@ is running before packaging it.
 
 1. Open [PWABuilder](https://www.pwabuilder.com/).
 2. Enter the production URL:
-   `https://adamsdenniskariuki.github.io/block-color-puzzle/`
+   `https://sortile.madebyfavor.com/`
 3. Allow PWABuilder to analyze the manifest and service worker.
 4. Select **Package for stores** and then **Windows**.
 5. Choose the **Microsoft Edge Hosted App** package.

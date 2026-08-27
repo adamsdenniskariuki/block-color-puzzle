@@ -1,3 +1,14 @@
 node_modules/
 *.log
 .DS_Store
+
+# Android release secrets and generated outputs
+*.jks
+*.keystore
+key.properties
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+dist/android/
+dist/windows-store/

@@ -90,7 +90,7 @@
 
   const COLS = 5;                   // one column per colour
   const APP_VERSION = '1.0.0';
-  const BUILD_ID = 'bcp-v36';       // must match CACHE in sw.js
+  const BUILD_ID = 'bcp-v37';       // must match CACHE in sw.js
   const FEEDBACK_EMAIL = 'sortilefeedback@gmail.com';
   const STORAGE_KEY = 'bcp.v1';
   const EXPORT_FORMAT = 'sortile-settings-and-stats';

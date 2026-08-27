@@ -287,25 +287,24 @@ test('the narrowest landscape phone still uses two columns', async (t) => {
   await context.close();
 });
 
-// The manifest must not lock orientation. "portrait" is respected by installed
-// PWAs, which would make the landscape layout unreachable for the users most
-// likely to need it.
-test('install metadata preserves the original app identity under the Sortile name', async () => {
+// The custom domain serves Sortile at the origin root. Keeping the old GitHub
+// project path here would give the TWA a different web identity.
+test('install metadata uses the custom-domain root as the app identity', async () => {
   const response = await fetch(`${server.url}/manifest.webmanifest`);
   assert.equal(response.status, 200, 'manifest should be served');
   const manifest = await response.json();
 
-  const productionManifest = new URL(
-    'https://adamsdenniskariuki.github.io/block-color-puzzle/manifest.webmanifest'
-  );
+  const productionManifest = new URL('https://sortile.madebyfavor.com/manifest.webmanifest');
   const resolvedStart = new URL(manifest.start_url, productionManifest);
   const resolvedId = new URL(manifest.id, resolvedStart.origin);
-  assert.equal(resolvedId.href, resolvedStart.href,
-    'the explicit id must match the implicit start_url identity used by the first release');
+  assert.equal(resolvedId.href, 'https://sortile.madebyfavor.com/index.html');
+  assert.equal(resolvedStart.href, 'https://sortile.madebyfavor.com/index.html');
   assert.equal(manifest.name, 'Sortile \u2014 Colour Block Puzzle');
   assert.equal(manifest.short_name, 'Sortile');
-  assert.equal(manifest.scope, './');
+  assert.equal(manifest.scope, '/');
 
+  // "portrait" is respected by installed PWAs and would make the landscape
+  // layout unreachable for the users most likely to need it.
   assert.notEqual(manifest.orientation, 'portrait',
     'locking portrait would make the landscape layout unreachable once installed');
   assert.notEqual(manifest.orientation, 'portrait-primary', 'same as above');

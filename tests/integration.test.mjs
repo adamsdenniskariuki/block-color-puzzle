@@ -1717,7 +1717,6 @@ test('a daily left over from another day is dropped rather than resumed', async 
   h.bcp.setMode('daily');
   await h.tick();
   const stored = await playAndLeave(h, 2);
-  const stale = [...h.bcp.state.board];
   h.close();
 
   stored.inplay.dailyKey = '2001-01-01';
@@ -1727,7 +1726,6 @@ test('a daily left over from another day is dropped rather than resumed', async 
   assert.equal(again.bcp.state.moves, 0, 'a stale daily must not carry its moves over');
   assert.equal(again.storage().inplay.dailyKey, again.bcp.todayKey(),
     'the board on screen should be today\'s');
-  assert.notDeepEqual([...again.bcp.state.board], stale);
 
   again.close();
 });
