@@ -344,7 +344,8 @@ test('Digital Asset Links binds the custom domain to the signed Android app', as
   assert.equal(app?.target?.package_name, 'com.madebyfavor.sortile');
   assert.deepEqual(app?.target?.sha256_cert_fingerprints, [
     '90:25:56:40:03:89:6C:FB:5F:A7:4B:A7:D5:A7:7E:EB:26:AF:9C:FF:6B:80:08:78:A5:EB:8E:1F:45:B9:54:42',
-    'CF:29:6A:4E:CF:57:61:97:BF:79:D0:EB:31:D9:27:C7:D1:CF:98:41:7D:89:5E:BB:BB:0C:74:88:53:DE:C9:A9'
+    'CF:29:6A:4E:CF:57:61:97:BF:79:D0:EB:31:D9:27:C7:D1:CF:98:41:7D:89:5E:BB:BB:0C:74:88:53:DE:C9:A9',
+    '02:CC:1C:BB:25:74:B8:11:DF:B4:F1:33:A9:21:1E:4D:7B:56:91:BB:13:3B:AC:1B:88:B6:04:07:0F:05:38:DE'
   ]);
 });
 
