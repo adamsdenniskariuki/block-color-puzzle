@@ -7,7 +7,8 @@
       "namespace": "android_app",
       "package_name": "com.madebyfavor.sortile",
       "sha256_cert_fingerprints": [
-        "90:25:56:40:03:89:6C:FB:5F:A7:4B:A7:D5:A7:7E:EB:26:AF:9C:FF:6B:80:08:78:A5:EB:8E:1F:45:B9:54:42"
+        "90:25:56:40:03:89:6C:FB:5F:A7:4B:A7:D5:A7:7E:EB:26:AF:9C:FF:6B:80:08:78:A5:EB:8E:1F:45:B9:54:42",
+        "CF:29:6A:4E:CF:57:61:97:BF:79:D0:EB:31:D9:27:C7:D1:CF:98:41:7D:89:5E:BB:BB:0C:74:88:53:DE:C9:A9"
       ]
     }
   }
